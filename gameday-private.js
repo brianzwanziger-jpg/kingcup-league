@@ -39,7 +39,7 @@ function privatePanel(){
  result.innerHTML='<h3>Manager links — copy now</h3><p class="note">Keep these links private. Anyone with a link can submit that manager’s pick.</p>'+createdLinks.map((l,i)=>'<div class="item"><b>'+safe(l.name)+'</b><br><button class="secondary" data-copy-link="'+i+'">Copy private link</button></div>').join('')+'<button id="privCopyAll" class="secondary full">Copy all links</button>';
  result.querySelectorAll('[data-copy-link]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(createdLinks[Number(b.dataset.copyLink)].url).then(()=>toast('Link copied')).catch(()=>toast('Copy unavailable in this browser')));
  result.querySelector('#privCopyAll').onclick=()=>navigator.clipboard.writeText(createdLinks.map(l=>l.name+': '+l.url).join('\n')).then(()=>toast('All links copied')).catch(()=>toast('Copy unavailable in this browser'));
- await refreshPrivate();
+ weeks=await rpc('gd_public_weeks');adminWeeks=await rpc('gd_admin_status',{},true);
  }catch(err){toast(err.message)}finally{btn.disabled=false}
  };
  }
