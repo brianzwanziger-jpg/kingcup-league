@@ -16,7 +16,7 @@ alter table public.gameday_private_invites enable row level security;
 revoke all on public.gameday_private_weeks, public.gameday_private_invites from anon, authenticated;
 -- Security definer functions expose only the fields needed by each caller.
 create or replace function public.gd_create_week(p_week integer,p_away text,p_home text,p_kickoff timestamptz,p_members jsonb)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare m jsonb; tok text; links jsonb:='[]'::jsonb;
 begin
  if not public.is_kingcup_admin() then raise exception 'Not authorized'; end if;
@@ -34,7 +34,7 @@ begin
  return links;
 end $$;
 create or replace function public.gd_invitation(p_token text)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare v record;
 begin
  select w.week,w.away,w.home,w.kickoff,i.member_name,i.pick into v
@@ -44,7 +44,7 @@ begin
  return jsonb_build_object('week',v.week,'away',v.away,'home',v.home,'kickoff',v.kickoff,'name',v.member_name,'pick',v.pick,'locked',now()>=v.kickoff);
 end $$;
 create or replace function public.gd_submit(p_token text,p_pick text)
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 declare v record;
 begin
  select w.week,w.away,w.home,w.kickoff,i.member_id into v
@@ -57,7 +57,7 @@ begin
  return jsonb_build_object('saved',true,'week',v.week);
 end $$;
 create or replace function public.gd_public_weeks()
-returns jsonb language sql security definer set search_path=public,pg_temp as $$
+returns jsonb language sql security definer set search_path=public,extensions,pg_temp as $$
  select coalesce(jsonb_agg(jsonb_build_object('week',w.week,'away',w.away,'home',w.home,'kickoff',w.kickoff,'locked',now()>=w.kickoff,'picks',
  case when now()>=w.kickoff then
  (select coalesce(jsonb_object_agg(i.member_id,i.pick) filter(where i.pick is not null),'{}'::jsonb) from public.gameday_private_invites i where i.week=w.week)
@@ -65,7 +65,7 @@ returns jsonb language sql security definer set search_path=public,pg_temp as $$
  from public.gameday_private_weeks w
 $$;
 create or replace function public.gd_admin_status()
-returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+returns jsonb language plpgsql security definer set search_path=public,extensions,pg_temp as $$
 begin
  if not public.is_kingcup_admin() then raise exception 'Not authorized'; end if;
  return (select coalesce(jsonb_agg(jsonb_build_object('week',w.week,'away',w.away,'home',w.home,'kickoff',w.kickoff,'members',
