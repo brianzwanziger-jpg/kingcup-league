@@ -2,7 +2,7 @@
 (()=>{
 const token=new URLSearchParams(location.search).get('gd_token');
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let weeks=[],adminWeeks=[],createdLinks=[];
+let weeks=[],adminWeeks=[],createdLinks=[],testWeeks=[],testLinks=[];
 function linkMessage(l){return 'KingCup GameDay: '+l.name+', make your private Week '+l.week+' pick ('+l.away+' vs '+l.home+') before kickoff. Your personal link: '+l.url+' — Please do not forward this link.';}
 function linkButtons(result){if(!result||!createdLinks.length)return;result.innerHTML='<h3>Manager links — send or copy now</h3><p class="note">Each link is private. Sending opens your Messages app; you choose the recipient and tap Send. Keep this page open until you finish sharing.</p>'+createdLinks.map((l,i)=>'<div class="item"><b>'+safe(l.name)+'</b><br><button class="secondary" data-text-link="'+i+'">Text link</button> <button class="secondary" data-copy-link="'+i+'">Copy link</button></div>').join('')+'<button id="privCopyAll" class="secondary full">Copy all links</button>';result.querySelectorAll('[data-text-link]').forEach(b=>b.onclick=()=>{const l=createdLinks[Number(b.dataset.textLink)];location.href='sms:&body='+encodeURIComponent(linkMessage(l));});result.querySelectorAll('[data-copy-link]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(createdLinks[Number(b.dataset.copyLink)].url).then(()=>toast('Link copied')).catch(()=>toast('Copy unavailable in this browser')));result.querySelector('#privCopyAll').onclick=()=>navigator.clipboard.writeText(createdLinks.map(l=>l.name+': '+l.url).join('\n')).then(()=>toast('All links copied')).catch(()=>toast('Copy unavailable in this browser'));}
 async function rpc(name,params={},admin=false){
@@ -12,7 +12,7 @@ async function rpc(name,params={},admin=false){
  return payload;
 }
 async function refreshPrivate(){
- try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(chosen==='e5'&&tab==='events')render();}
+ try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session)testWeeks=await rpc('gd_test_status',{},true);else testWeeks=[];if(chosen==='e5'&&tab==='events')render();}
  catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
 function privatePanel(){
@@ -27,6 +27,7 @@ function privatePanel(){
  }).join('')+
  (editing&&session?'<h3>Create a private week</h3><p class="note">Choose a future kickoff. Each manager receives a unique link. Copy the links immediately: for security, they are displayed only when created.</p><label>Week number</label><input id="privWeek" type="number" min="1" step="1"><label>Away team</label><input id="privAway"><label>Home team</label><input id="privHome"><label>Kickoff (your local time)</label><input id="privKickoff" type="datetime-local"><button id="privCreate" class="full">Create private manager links</button><div id="privResult"></div><button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
  if(editing&&session){
+ testPanel(root);
  linkButtons(root.querySelector('#privResult'));
  root.querySelector('#privRefresh').onclick=refreshPrivate;
  root.querySelector('#privCreate').onclick=async()=>{
@@ -45,6 +46,18 @@ function privatePanel(){
  };
  }
  return root;
+}
+function testPanel(root){
+ const panel=document.createElement('div');panel.className='card';panel.style.marginTop='16px';
+ panel.innerHTML='<h2>🧪 Test Mode — not official</h2><p class="note">Test picks never appear in public standings or official GameDay weeks. Create a short test, text yourself a private invitation, then delete it.</p>'+
+ testWeeks.map(w=>'<div class="item"><b>Test '+safe(w.week)+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(w.locked?'Locked':'Open')+'</p>'+w.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?(w.locked?safe(m.pick):'Submitted (commissioner can view: '+safe(m.pick)+')'):'Not submitted')+'</div>').join('')+'<button class="danger" data-delete-test="'+w.week+'">Delete this test</button></div>').join('')+
+ '<label>Away team</label><input id="testAway" value="Ohio St"><label>Home team</label><input id="testHome" value="Iowa"><label>Test kickoff (local time)</label><input type="datetime-local" id="testKickoff"><button class="secondary full" id="testCreate">Generate test links</button><div id="testLinks"></div>';
+ root.appendChild(panel);
+ panel.querySelector('#testKickoff').value=new Date(Date.now()+10*60000-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+ const result=panel.querySelector('#testLinks');
+ if(testLinks.length){result.innerHTML='<p class="note">Test links: send only to yourself. These disappear when you close this page.</p>'+testLinks.map((l,i)=>'<div class="item"><b>'+safe(l.name)+'</b><br><button class="secondary" data-test-text="'+i+'">Text test link</button> <button class="secondary" data-test-copy="'+i+'">Copy test link</button></div>').join('');result.querySelectorAll('[data-test-text]').forEach(b=>b.onclick=()=>{location.href='sms:&body='+encodeURIComponent(linkMessage(testLinks[Number(b.dataset.testText)]));});result.querySelectorAll('[data-test-copy]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(testLinks[Number(b.dataset.testCopy)].url).then(()=>toast('Test link copied')).catch(()=>toast('Copy unavailable')));}
+ panel.querySelector('#testCreate').onclick=async()=>{const away=panel.querySelector('#testAway').value.trim(),home=panel.querySelector('#testHome').value.trim(),kickoff=new Date(panel.querySelector('#testKickoff').value),btn=panel.querySelector('#testCreate');if(!away||!home||away.toLowerCase()===home.toLowerCase()||!Number.isFinite(kickoff.getTime())||kickoff.getTime()<=Date.now())return toast('Enter two teams and a future kickoff');btn.disabled=true;try{const response=await rpc('gd_create_test',{p_away:away,p_home:home,p_kickoff:kickoff.toISOString(),p_members:data.members.map(m=>({id:m.id,name:m.name}))},true);testLinks=response.links.map(l=>({name:l.name,week:'TEST',away,home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)}));testWeeks=await rpc('gd_test_status',{},true);render();toast('Test created — text yourself a link')}catch(err){toast(err.message)}finally{btn.disabled=false}};
+ panel.querySelectorAll('[data-delete-test]').forEach(b=>b.onclick=async()=>{if(!confirm('Permanently delete this test and all its test picks?'))return;try{await rpc('gd_delete_test',{p_week:Number(b.dataset.deleteTest)},true);testWeeks=await rpc('gd_test_status',{},true);testLinks=[];render();toast('Test deleted')}catch(err){toast(err.message)}});
 }
 const original=gameDayDetail;
 gameDayDetail=function(e){original(e);const detail=$('eventDetail');if(detail)detail.appendChild(privatePanel())};
