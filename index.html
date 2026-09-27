@@ -41,6 +41,7 @@ async function refreshYahoo(){
  try{const url=new URL(cfg.yahooSyncUrl,location.href);if(url.protocol!=='https:')throw Error('Sync URL must use HTTPS');yahooLoading=true;yahooError='';yahooDetail();const r=await fetch(url.toString(),{credentials:'omit',headers:{Accept:'application/json'}});if(!r.ok)throw Error('Yahoo sync endpoint returned HTTP '+r.status);const result=await r.json();if(String(result.leagueId)!==YAHOO_LEAGUE_ID||String(result.season)!==YAHOO_SEASON||!Array.isArray(result.standings))throw Error('Invalid Yahoo league response');const clean=result.standings.map(x=>({rank:x.rank,teamName:String(x.teamName??''),wins:x.wins,losses:x.losses,ties:x.ties,pointsFor:x.pointsFor}));if(clean.some(x=>!x.teamName))throw Error('Yahoo response has a missing team name');yahooSnapshot={standings:clean};yahooLastSync=new Date().toISOString();}catch(e){yahooError=e.message}finally{yahooLoading=false;if(chosen==='e0')yahooDetail()}
 }
 
+
 const CHAMPION_EVENTS=[
  {id:'mlb',icon:'⚾',name:'MLB',month:'November'},
  {id:'cfb',icon:'🏈',name:'College Football',month:'January'},
@@ -50,22 +51,102 @@ const CHAMPION_EVENTS=[
  {id:'nba',icon:'🏀',name:'NBA',month:'June'},
  {id:'nhl',icon:'🏒',name:'NHL',month:'June'}
 ];
+function champName(s){return String(s||'').trim().toLowerCase()}
+function champScore(v){return v!==''&&v!=null&&Number.isFinite(Number(v))?Number(v):null}
+function champEventPoints(ev,r){
+ const out=Object.fromEntries(data.members.map(m=>[m.id,0]));
+ if(ev.id==='golf'){
+  const winner=champName(r.winner),scores=r.golfScores||{};
+  for(const m of data.members){
+   const pick=r.golfPicks?.[m.id];if(!pick)continue;
+   const selected=[pick.top1,pick.top2,pick.wildcard].map(champName);
+   if(winner&&selected.includes(winner))out[m.id]+=2;
+   if(winner&&champName(pick.wildcard)===winner)out[m.id]+=1;
+  }
+  const totals=data.members.map(m=>{
+   const pick=r.golfPicks?.[m.id];
+   if(!pick||![pick.top1,pick.top2,pick.wildcard].every(Boolean))return null;
+   const nums=[pick.top1,pick.top2,pick.wildcard].map(n=>champScore(scores[champName(n)]));
+   return nums.every(n=>n!==null)?{id:m.id,total:nums.reduce((a,b)=>a+b,0)}:null;
+  }).filter(Boolean);
+  // Only award combined-score bonus after every entered three-golfer lineup has a recorded score.
+  const complete=data.members.filter(m=>{const p=r.golfPicks?.[m.id];return p&&[p.top1,p.top2,p.wildcard].every(Boolean)}).length;
+  if(complete&&totals.length===complete&&r.golfScoresFinal){
+   const best=Math.min(...totals.map(t=>t.total));
+   totals.filter(t=>t.total===best).forEach(t=>out[t.id]++);
+  }
+ }else{
+  const winner=champName(r.winner);
+  const eligible=[];
+  for(const m of data.members){
+   const pick=r.picks?.[m.id],team=typeof pick==='string'?pick:pick?.team;
+   if(!winner||champName(team)!==winner)continue;
+   out[m.id]=2;
+   const predicted=typeof pick==='object'?pick?.score:null;
+   const actual=r.actualScore;
+   if(predicted&&actual&&[predicted.a,predicted.b,actual.a,actual.b].every(v=>champScore(v)!==null)){
+    const error=Math.abs(Number(predicted.a)-Number(actual.a))+Math.abs(Number(predicted.b)-Number(actual.b));
+    eligible.push({id:m.id,error});
+   }
+  }
+  if(eligible.length){
+   const best=Math.min(...eligible.map(x=>x.error));
+   eligible.filter(x=>x.error===best).forEach(x=>out[x.id]++);
+  }
+ }
+ return out;
+}
 function championsDetail(e){
  const stored=e.champions||{};
- $('eventDetail').innerHTML=`<div class="card"><div class="row between"><h2>🏆 Champion of Champions</h2><button class="secondary" id="closeDetail">✕</button></div><p class="note">Record everyone's championship picks and the actual results. Scoring has not been decided; these entries do not award KingCup points.</p>${CHAMPION_EVENTS.map(ev=>{const r=stored[ev.id]||{};return `<div class="item"><h2>${ev.icon} ${esc(ev.name)} <small>(${esc(ev.month)})</small></h2><p class="note">Actual champion: <b>${esc(r.winner||'Pending')}</b></p>${data.members.map(m=>`<div class="item row between"><b>${esc(m.name)}</b><span>${esc(r.picks?.[m.id]||'No pick')}</span></div>`).join('')}${editing?`<button class="secondary full" data-champ-edit="${ev.id}">Edit picks & result</button><div id="champ-editor-${ev.id}"></div>`:''}</div>`}).join('')}</div>`;
+ const points=Object.fromEntries(data.members.map(m=>[m.id,0]));
+ CHAMPION_EVENTS.forEach(ev=>{const r=champEventPoints(ev,stored[ev.id]||{});data.members.forEach(m=>points[m.id]+=r[m.id]||0)});
+ const board=data.members.slice().sort((a,b)=>points[b.id]-points[a.id]||a.name.localeCompare(b.name));
+ $('eventDetail').innerHTML=`<div class="card"><div class="row between"><h2>🏆 Champion of Champions</h2><button class="secondary" id="closeDetail">✕</button></div><p class="note">Seven-event running total. Correct champion: 2 points; correct champion with closest predicted final score: 3 total (ties share the bonus). Masters uses separate rules. These event totals do not change overall KingCup points until final placements are entered.</p><h2>Challenge standings</h2>${board.map(m=>`<div class="item row between"><b>${esc(m.name)}</b><span class="score">${points[m.id]} pts</span></div>`).join('')}${CHAMPION_EVENTS.map(ev=>{const r=stored[ev.id]||{},pts=champEventPoints(ev,r);return `<div class="item"><h2>${ev.icon} ${esc(ev.name)} <small>(${esc(ev.month)})</small></h2><p class="note">Actual champion: <b>${esc(r.winner||'Pending')}</b></p>${ev.id==='golf'?`<p class="note">Top-eight odds list: ${esc((r.top8||[]).join(', ')||'Not entered')} · Combined-score bonus ${r.golfScoresFinal?'finalized':'pending'}</p>`:''}${data.members.map(m=>{const p=ev.id==='golf'?r.golfPicks?.[m.id]:r.picks?.[m.id];const shown=ev.id==='golf'?[p?.top1,p?.top2,p?.wildcard].filter(Boolean).join(' / '):typeof p==='string'?p:p?.team||'';const prediction=ev.id!=='golf'&&p?.score&&typeof p==='object'?` (${esc(p.score.a)}–${esc(p.score.b)})`:'';return `<div class="item row between"><b>${esc(m.name)}</b><span>${esc(shown||'No pick')}${prediction} · <b>${pts[m.id]} pts</b></span></div>`}).join('')}${editing?`<button class="secondary full" data-champ-edit="${ev.id}">Edit picks & result</button><div id="champ-editor-${ev.id}"></div>`:''}</div>`}).join('')}</div>`;
  $('closeDetail').onclick=()=>{chosen=null;$('eventDetail').innerHTML=''};
  if(!editing)return;
  document.querySelectorAll('[data-champ-edit]').forEach(b=>b.onclick=()=>{
   const ev=CHAMPION_EVENTS.find(x=>x.id===b.dataset.champEdit),r=stored[ev.id]||{};
   const holder=$('champ-editor-'+ev.id);
-  holder.innerHTML=`<div class="card"><h2>${esc(ev.name)} — Edit</h2><label>Actual champion (leave blank until confirmed)</label><input id="champ-winner" value="${esc(r.winner||'')}" placeholder="Actual champion">${data.members.map(m=>`<label>${esc(m.name)}'s pick</label><input data-champ-pick="${esc(m.id)}" value="${esc(r.picks?.[m.id]||'')}" placeholder="Team or golfer">`).join('')}<button id="champ-save" class="full">Save picks & result</button></div>`;
-  $('champ-save').onclick=()=>{
-   const picks={};data.members.forEach(m=>{const v=document.querySelector(`[data-champ-pick="${CSS.escape(m.id)}"]`).value.trim();if(v)picks[m.id]=v});
-   if(!e.champions)e.champions={};
-   e.champions[ev.id]={winner:$('champ-winner').value.trim(),picks};
-   if(e.status==='Upcoming')e.status='Live';
-   save();
-  };
+  if(ev.id==='golf'){
+   holder.innerHTML=`<div class="card"><h2>Masters picks and results</h2><label>Top 8 golfers by pre-tournament odds (one per line)</label><textarea id="golf-top8" rows="8" style="width:100%;background:#0c1d18;color:white" placeholder="Enter eight golfer names">${esc((r.top8||[]).join('\n'))}</textarea><label>Actual winner</label><input id="champ-winner" value="${esc(r.winner||'')}">${data.members.map(m=>{const p=r.golfPicks?.[m.id]||{};return `<div class="item"><b>${esc(m.name)}</b><label>Top 8 pick 1</label><input data-golf="${esc(m.id)}" data-field="top1" value="${esc(p.top1||'')}"><label>Top 8 pick 2</label><input data-golf="${esc(m.id)}" data-field="top2" value="${esc(p.top2||'')}"><label>Wildcard (outside top 8)</label><input data-golf="${esc(m.id)}" data-field="wildcard" value="${esc(p.wildcard||'')}"></div>`}).join('')}<h2>Final golfer scores</h2><p class="note">Enter each golfer's final tournament stroke total. For missed cuts/withdrawals, use the commissioner-approved tournament scoring convention consistently. Combined-score bonus is withheld until you mark scores final.</p><div id="golf-score-fields"></div><label><input type="checkbox" id="golf-final" style="width:auto" ${r.golfScoresFinal?'checked':''}> All golfer scores final; award combined-score bonus</label><button id="champ-save" class="full">Save Masters picks & results</button></div>`;
+   const updateScores=()=>{
+    const names=new Map();
+    data.members.forEach(m=>['top1','top2','wildcard'].forEach(f=>{const n=holder.querySelector(`[data-golf="${CSS.escape(m.id)}"][data-field="${f}"]`)?.value.trim();if(n)names.set(champName(n),n)}));
+    const fields=$('golf-score-fields');const existing={};fields.querySelectorAll('[data-golf-score]').forEach(x=>existing[x.dataset.golfScore]=x.value);
+    fields.innerHTML=[...names].map(([key,n])=>`<label>${esc(n)} — total strokes</label><input type="number" step="1" data-golf-score="${esc(key)}" value="${esc(existing[key]??r.golfScores?.[key]??'')}">`).join('');
+   };
+   holder.querySelectorAll('[data-golf]').forEach(x=>x.addEventListener('change',updateScores));updateScores();
+   $('champ-save').onclick=()=>{
+    const top8=$('golf-top8').value.split('\n').map(x=>x.trim()).filter(Boolean);
+    if(top8.length!==8||new Set(top8.map(champName)).size!==8)return toast('Enter exactly 8 distinct top-odds golfers');
+    const topSet=new Set(top8.map(champName)),picks={};
+    for(const m of data.members){
+     const p={};['top1','top2','wildcard'].forEach(f=>p[f]=holder.querySelector(`[data-golf="${CSS.escape(m.id)}"][data-field="${f}"]`).value.trim());
+     if(Object.values(p).some(Boolean)){
+      if(!Object.values(p).every(Boolean)||!topSet.has(champName(p.top1))||!topSet.has(champName(p.top2))||topSet.has(champName(p.wildcard))||new Set(Object.values(p).map(champName)).size!==3)return toast('Check the three picks for '+m.name);
+      picks[m.id]=p;
+     }
+    }
+    const scores={};holder.querySelectorAll('[data-golf-score]').forEach(x=>{if(x.value.trim()!=='')scores[x.dataset.golfScore]=Number(x.value)});
+    if($('golf-final').checked&&Object.values(picks).some(p=>[p.top1,p.top2,p.wildcard].some(n=>champScore(scores[champName(n)])===null)))return toast('Enter all selected golfers’ scores before finalizing');
+    e.champions=e.champions||{};e.champions[ev.id]={top8,winner:$('champ-winner').value.trim(),golfPicks:picks,golfScores:scores,golfScoresFinal:$('golf-final').checked};
+    if(e.status==='Upcoming')e.status='Live';save();
+   };
+  }else{
+   holder.innerHTML=`<div class="card"><h2>${esc(ev.name)} — Picks and result</h2><label>Actual champion</label><input id="champ-winner" value="${esc(r.winner||'')}"><label>Actual final score (champion / runner-up)</label><div class="grid"><input type="number" id="actual-a" placeholder="Champion" value="${esc(r.actualScore?.a??'')}"><input type="number" id="actual-b" placeholder="Runner-up" value="${esc(r.actualScore?.b??'')}"></div>${data.members.map(m=>{const p=r.picks?.[m.id],team=typeof p==='string'?p:p?.team||'';return `<div class="item"><b>${esc(m.name)}</b><label>Champion pick</label><input data-champ-pick="${esc(m.id)}" value="${esc(team)}"><label>Predicted score (picked champion / opponent)</label><div class="grid"><input type="number" data-score-a="${esc(m.id)}" placeholder="Picked champion" value="${esc(typeof p==='object'?p?.score?.a??'':'')}"><input type="number" data-score-b="${esc(m.id)}" placeholder="Opponent" value="${esc(typeof p==='object'?p?.score?.b??'':'')}"></div></div>`}).join('')}<button id="champ-save" class="full">Save picks & result</button></div>`;
+   $('champ-save').onclick=()=>{
+    const picks={};for(const m of data.members){
+     const team=holder.querySelector(`[data-champ-pick="${CSS.escape(m.id)}"]`).value.trim();
+     const a=holder.querySelector(`[data-score-a="${CSS.escape(m.id)}"]`).value.trim(),b=holder.querySelector(`[data-score-b="${CSS.escape(m.id)}"]`).value.trim();
+     if((a||b)&&(!team||a===''||b===''))return toast('Enter both predicted scores for '+m.name);
+     if(team)picks[m.id]={team,score:a!==''?{a:Number(a),b:Number(b)}:null};
+    }
+    const a=$('actual-a').value.trim(),b=$('actual-b').value.trim();
+    if((a||b)&&(a===''||b===''))return toast('Enter both actual scores');
+    e.champions=e.champions||{};e.champions[ev.id]={winner:$('champ-winner').value.trim(),actualScore:a!==''?{a:Number(a),b:Number(b)}:null,picks};
+    if(e.status==='Upcoming')e.status='Live';save();
+   };
+  }
  });
 }
 
