@@ -185,4 +185,4 @@ function gameEditor(e,index){const games=e.gameday?.games||[];const g=index<0?{w
  if(index>=0)$('gdDelete').onclick=()=>{if(confirm('Delete this week and all picks for it?')){e.gameday.games.splice(index,1);save()}};
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{if(b.dataset.eventTab){tab='events';chosen=b.dataset.eventTab}else{tab=b.dataset.tab;chosen=null}render();window.scrollTo(0,0);b.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'})});if(!new URLSearchParams(location.search).has('gd_token')){render();if(cloud){(async()=>{await restoreSession();await loadCloud();render()})();setInterval(()=>{if(!editing)loadCloud()},30000)}}
-</script><script src="gameday-private.js?v=4"></script></body></html>
+</script><script src="gameday-private.js?v=5"></script></body></html>
