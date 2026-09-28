@@ -17,6 +17,19 @@ async function refreshPrivate(){
  try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){testWeeks=await rpc('gd_test_status',{},true);phones=await rpc('gd_phone_list',{},true)}else testWeeks=[];if(chosen==='e5'&&tab==='events')render();}
  catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
+async function espnLookup(root){
+ const status=root.querySelector('#espnStatus'),date=root.querySelector('#espnDate').value;
+ if(!date)return toast('Choose a game date');
+ status.textContent='Checking ESPN college football schedule…';
+ try{
+ const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=200&dates='+date.replace(/-/g,''));if(!r.ok)throw Error('ESPN schedule unavailable');
+ const payload=await r.json(),events=(payload.events||[]).filter(e=>e.competitions?.[0]?.competitors?.length===2);
+ const options=events.map(e=>{const c=e.competitions[0].competitors,away=c.find(x=>x.homeAway==='away'),home=c.find(x=>x.homeAway==='home');return {id:e.id,away:away?.team?.displayName,home:home?.team?.displayName,kickoff:e.date,completed:e.status?.type?.completed,winner:c.find(x=>x.winner)?.team?.displayName,score:c.map(x=>x.team?.abbreviation+': '+(x.score||'—')).join(' · ')} }).filter(x=>x.away&&x.home);
+ if(!options.length){status.textContent='No games returned. Try another date or enter teams manually.';return}
+ status.innerHTML='<p class="note">ESPN schedule results are not necessarily the College GameDay featured matchup. Confirm against ESPN’s announcement before using.</p><select id="espnGame"><option value="">Choose the confirmed GameDay matchup</option>'+options.map((e,i)=>'<option value="'+i+'">'+safe(e.away)+' at '+safe(e.home)+' — '+safe(new Date(e.kickoff).toLocaleString())+'</option>').join('')+'</select><button class="secondary full" id="espnUse">Use selected matchup</button><p id="espnSelected" class="note"></p>';
+ status.querySelector('#espnUse').onclick=()=>{const i=status.querySelector('#espnGame').value;if(i==='')return toast('Select a game');const e=options[Number(i)];root.querySelector('#privAway').value=e.away;root.querySelector('#privHome').value=e.home;const d=new Date(e.kickoff);root.querySelector('#privKickoff').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);status.querySelector('#espnSelected').textContent='Loaded '+e.away+' at '+e.home+(e.completed?' · Final: '+e.score:'')+'. Confirm week number and kickoff before creating invitations.';toast('ESPN matchup loaded')};
+ }catch(err){status.textContent='ESPN schedule could not be loaded here. You can still enter the matchup manually. '+err.message}
+}
 function privatePanel(){
  const root=document.createElement('section');root.className='card';root.id='privateGameDay';
  const now=Date.now();
@@ -27,10 +40,12 @@ function privatePanel(){
  (locked?data.members.map(m=>'<div class="mini">'+safe(m.name)+': '+safe(w.picks?.[m.id]||'No pick')+'</div>').join(''):'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&status?'<details><summary>Commissioner-only submission status</summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+'</div>').join('')+'</details>':'')+'</div>';
  }).join('')+
- (editing&&session?'<h3>Create a private week</h3><p class="note">Choose a future kickoff. Each manager receives a unique link. Copy the links immediately: for security, they are displayed only when created.</p><label>Week number</label><input id="privWeek" type="number" min="1" step="1"><label>Away team</label><input id="privAway"><label>Home team</label><input id="privHome"><label>Kickoff (your local time)</label><input id="privKickoff" type="datetime-local"><button id="privCreate" class="full">Create private manager links</button><div id="privResult"></div><button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
+ (editing&&session?'<h3>ESPN College GameDay matchup</h3><p class="note">Check ESPN’s announcement first, then find the confirmed game in its schedule. No invitations are sent automatically.</p><a href="https://espnpressroom.com/" target="_blank" rel="noopener">ESPN announcements ↗</a><label>Game date</label><input id="espnDate" type="date"><button id="espnFind" class="secondary full">Find ESPN matchups</button><div id="espnStatus"></div><h3>Create a private week</h3><p class="note">Choose a future kickoff. Each manager receives a unique link. Copy the links immediately: for security, they are displayed only when created.</p><label>Week number</label><input id="privWeek" type="number" min="1" step="1"><label>Away team</label><input id="privAway"><label>Home team</label><input id="privHome"><label>Kickoff (your local time)</label><input id="privKickoff" type="datetime-local"><button id="privCreate" class="full">Create private manager links</button><div id="privResult"></div><button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
  if(editing&&session){
  phonePanel(root);
  testPanel(root);
+ root.querySelector('#espnDate').value=new Date().toISOString().slice(0,10);
+ root.querySelector('#espnFind').onclick=()=>espnLookup(root);
  linkButtons(root.querySelector('#privResult'));
  root.querySelector('#privRefresh').onclick=refreshPrivate;
  root.querySelector('#privCreate').onclick=async()=>{
