@@ -39,7 +39,7 @@ function privatePanel(){
  weeks.map(w=>{
  const locked=now>=Date.parse(w.kickoff),status=adminWeeks.find(a=>a.week===w.week);
  return '<div class="item"><b>Week '+safe(w.week)+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+
- (locked?data.members.map(m=>'<div class="mini">'+safe(m.name)+': '+safe(w.picks?.[m.id]||'No pick')+'</div>').join(''):'<p class="note">Other managers cannot see selections yet.</p>')+
+ (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&session&&locked&&status?'<button class="secondary full" data-text-all-picks="'+safe(w.week)+'">📲 Text All Picks — Week '+safe(w.week)+'</button>':'')+
  (editing&&status?'<details open><summary><b>Commissioner pick tracker — Week '+safe(w.week)+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
  }).join('')+
