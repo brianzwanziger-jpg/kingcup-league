@@ -94,8 +94,17 @@ function testPanel(root){
  const panel=document.createElement('div');panel.className='card';panel.style.marginTop='16px';
  panel.innerHTML='<h2>🧪 Test Mode — not official</h2><p class="note">Test picks never appear in public standings or official GameDay weeks. Create a short test, text yourself a private invitation, then delete it.</p>'+
  testWeeks.map(w=>'<div class="item"><b>Test '+safe(w.week)+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(w.locked?'Locked':'Open')+'</p>'+w.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?(w.locked?safe(m.pick):'Submitted (commissioner can view: '+safe(m.pick)+')'):'Not submitted')+'</div>').join('')+'<button class="danger" data-delete-test="'+w.week+'">Delete this test</button></div>').join('')+
- '<label>Away team</label><input id="testAway" value="Ohio St"><label>Home team</label><input id="testHome" value="Iowa"><label>Test kickoff (local time)</label><input type="datetime-local" id="testKickoff"><button class="secondary full" id="testCreate">Generate test links</button><div id="testLinks"></div>';
+ '<button class="secondary full" id="testGroupText">Preview Test Group Text (no sending)</button><label>Away team</label><input id="testAway" value="Ohio St"><label>Home team</label><input id="testHome" value="Iowa"><label>Test kickoff (local time)</label><input type="datetime-local" id="testKickoff"><button class="secondary full" id="testCreate">Generate test links</button><div id="testLinks"></div>';
  root.appendChild(panel);
+ panel.querySelector('#testGroupText').onclick=()=>{
+  const members=data.members;
+  const lines=members.map((m,i)=>m.name+': '+(i%2?'Texas':'Oklahoma'));
+  const message='🏈 GameDay TEST — Sample Locked Picks\\nOklahoma vs Texas\\n\\n'+lines.join('\\n')+'\\n\\nTEST ONLY — NOT OFFICIAL';
+  const recipients=[...new Set(members.map(m=>String(phones[m.id]||'').replace(/[^0-9+]/g,'')).filter(Boolean))];
+  if(!recipients.length)return toast('No saved phone numbers');
+  if(!confirm('Open a group SMS draft addressed to '+recipients.length+' saved numbers? This is sample data. Do NOT tap Send.'))return;
+  location.href='sms:'+recipients.join(',')+'&body='+encodeURIComponent(message);
+ };
  panel.querySelector('#testKickoff').value=new Date(Date.now()+10*60000-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
  const result=panel.querySelector('#testLinks');
  if(testLinks.length){result.innerHTML='<p class="note">Test links: send only to yourself. These remain in this browser tab until you close it or delete the test.</p>'+testLinks.map((l,i)=>'<div class="item"><b>'+safe(l.name)+'</b><br><button class="secondary" data-test-text="'+i+'">Text test link</button> <button class="secondary" data-test-copy="'+i+'">Copy test link</button></div>').join('');result.querySelectorAll('[data-test-text]').forEach(b=>b.onclick=()=>{smsLink(testLinks[Number(b.dataset.testText)]);});result.querySelectorAll('[data-test-copy]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(testLinks[Number(b.dataset.testCopy)].url).then(()=>toast('Test link copied')).catch(()=>toast('Copy unavailable')));}
