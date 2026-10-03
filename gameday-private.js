@@ -56,7 +56,7 @@ function privatePanel(){
   const message='🏈 GameDay Week '+week+' — Locked Picks\n'+w.away+' vs '+w.home+'\n\n'+data.members.map(m=>{
    const p=status.members.find(x=>x.id===m.id);
    return m.name+': '+(p?.pick||'No pick');
-  }).join('\n');
+  }).join('\n\n');
   location.href='sms://open?addresses='+recipients.join(',')+';?&body='+encodeURIComponent(message);
  });
  root.querySelectorAll('[data-resend-week]').forEach(b=>b.onclick=async()=>{
@@ -99,7 +99,7 @@ function testPanel(root){
  panel.querySelector('#testGroupText').onclick=()=>{
   const members=data.members;
   const lines=members.map((m,i)=>m.name+': '+(i%2?'Texas':'Oklahoma'));
-  const message='🏈 GameDay TEST — Sample Locked Picks\nOklahoma vs Texas\n\n'+lines.join('\n')+'\n\nTEST ONLY — NOT OFFICIAL';
+  const message='🏈 GameDay TEST — Sample Locked Picks\nOklahoma vs Texas\n\n'+lines.join('\n\n')+'\n\nTEST ONLY — NOT OFFICIAL';
   const recipients=[...new Set(members.map(m=>String(phones[m.id]||'').replace(/[^0-9+]/g,'')).filter(Boolean))];
   if(!recipients.length)return toast('No saved phone numbers');
   if(!confirm('Open a group SMS draft addressed to '+recipients.length+' saved numbers? This is sample data. Do NOT tap Send.'))return;
