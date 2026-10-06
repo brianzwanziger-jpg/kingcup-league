@@ -19,9 +19,9 @@ gameDayDetail=function(e){
  if(!eligible.length){rows.textContent='No locked weeks yet.';return}
  rows.innerHTML='';
  for(const w of eligible){
- const old=(e.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week));
+ const pickNo=Number(w.pick_no||1);const old=(e.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
  const row=document.createElement('div');row.className='item';
- const label=document.createElement('b');label.textContent='Week '+w.week+': '+w.away+' vs '+w.home;row.appendChild(label);
+ const label=document.createElement('b');label.textContent='Week '+w.week+(pickNo>1?' — Pick '+pickNo:'')+': '+w.away+' vs '+w.home;row.appendChild(label);
  const select=document.createElement('select');
  for(const name of ['',w.away,w.home]){const opt=document.createElement('option');opt.value=name;opt.textContent=name||'Select winning team';select.appendChild(opt)}
  select.value=old?.winner||'';row.appendChild(select);
@@ -32,8 +32,8 @@ gameDayDetail=function(e){
  if(old&&(old.away!==w.away||old.home!==w.home)&&!confirm('Replace the existing Week '+w.week+' matchup and picks?'))return;
  const picks={};for(const m of data.members){const p=w.picks?.[m.id];if(p===w.away||p===w.home)picks[m.id]=p}
  if(Object.keys(picks).length===0&&!confirm('No locked picks found. Continue anyway?'))return;
- const games=e.gameday?.games||[];const i=games.findIndex(g=>Number(g.week)===Number(w.week));
- const record={week:Number(w.week),away:w.away,home:w.home,winner:select.value,picks};
+ const games=e.gameday?.games||[];const i=games.findIndex(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
+ const record={week:Number(w.week),pick_no:pickNo,away:w.away,home:w.home,winner:select.value,picks};
  if(!e.gameday)e.gameday={games:[]};
  if(i<0)e.gameday.games.push(record);else e.gameday.games[i]=record;
  e.gameday.games.sort((a,b)=>Number(a.week)-Number(b.week));e.status='Live';
