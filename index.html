@@ -7,6 +7,9 @@
 #kcHeroHeader .kc-hero-inner{width:100%;max-width:720px;margin:auto;padding:18px;box-sizing:border-box;position:relative;z-index:1}
 #kcHeroHeader.kc-art-banner .kc-hero-inner{display:flex;justify-content:flex-end;flex-direction:column;padding:8px 14px;background:linear-gradient(0deg,rgba(3,12,26,.64),transparent 37%)}
 #kcHeroHeader.kc-art-banner #pageTitle,#kcHeroHeader.kc-art-banner #pageEyebrow{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* Hide the fine horizontal join embedded in the cropped collage artwork.
+   Repaint only a narrow strip using pixels immediately above the join. */
+#kcHeroHeader.kc-art-banner::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background-image:inherit;background-repeat:no-repeat;background-position:center;background-size:100% 100%;transform:translateY(4px);clip-path:inset(56% 0 41% 0)}
 #kcHeroHeader.kc-art-banner #pageSubtitle{display:none}
 #kcHeroHeader.kc-art-banner #seasonTag{display:none}
 @media(max-width:480px){#kcHeroHeader.kc-art-banner{aspect-ratio:2.65/1;min-height:120px;background-size:100% 100%}#kcHeroHeader .kc-hero-inner{padding:16px}}
