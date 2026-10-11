@@ -31,7 +31,7 @@ function showHistory(){
  const race=document.getElementById('race');
  if(race&&!race.querySelector('.kc-kingcup-history')){
  const card=document.createElement('div');card.className='card kc-kingcup-history';card.style.marginTop='14px';
- card.innerHTML='<h2>🏆 Past KingCup Winners</h2>'+records.e4.slice().reverse().map(([year,k])=>'<div class="item row between"><b>'+year+'</b><span>'+esc(teams[k])+' — '+esc(people[k])+'</span></div>').join('');
+ card.innerHTML='<details class="kc-past-winners"><summary style="cursor:pointer;font-size:1.15em;font-weight:700">🏆 Past KingCup Winners ▾</summary><div style="padding-top:12px">'+records.e4.slice().reverse().map(([year,k])=>'<div class="item row between"><b>'+year+'</b><span>'+esc(teams[k])+' — '+esc(people[k])+'</span></div>').join('')+'</div></details>';
  race.appendChild(card);
  }
  const detailEl=document.getElementById('eventDetail');if(detailEl&&chosen&&records[chosen]&&!detailEl.querySelector('.kc-history')){
