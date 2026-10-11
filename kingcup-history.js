@@ -31,12 +31,12 @@ function showHistory(){
  const race=document.getElementById('race');
  if(race&&!race.querySelector('.kc-kingcup-history')){
  const card=document.createElement('div');card.className='card kc-kingcup-history';card.style.marginTop='14px';
- card.innerHTML='<h2>🏆 Past KingCup Winners</h2>'+records.e4.slice().reverse().map(([year,k])=>'<div class="item row between"><b>'+year+'</b><span>'+esc(teams[k])+' — '+esc(people[k])+'</span></div>').join('')+'<p class="note">2016: No champion recorded.</p>';
+ card.innerHTML='<h2>🏆 Past KingCup Winners</h2>'+records.e4.slice().reverse().map(([year,k])=>'<div class="item row between"><b>'+year+'</b><span>'+esc(teams[k])+' — '+esc(people[k])+'</span></div>').join('');
  race.appendChild(card);
  }
  const detailEl=document.getElementById('eventDetail');if(detailEl&&chosen&&records[chosen]&&!detailEl.querySelector('.kc-history')){
  const card=document.createElement('div');card.className='card kc-history';card.style.marginTop='14px';
- card.innerHTML='<details><summary style="cursor:pointer;font-weight:700">🏆 Past Champions ('+titles[chosen]+')</summary><div style="padding-top:12px">'+records[chosen].slice().reverse().map(([year,k])=>'<div class="item"><b>'+year+'</b> · '+(k?esc(teams[k])+' — '+esc(people[k]):'The Caronavirus (no tournament champion)')+'</div>').join('')+(chosen==='e5'?'<p class="note">2016: No winner supplied.</p>':'')+(chosen==='e4'?'<p class="note">2016: Marked “x” in historical records; no champion assigned.</p>':'')+'</div></details>';
+ card.innerHTML='<details><summary style="cursor:pointer;font-weight:700">🏆 Past Champions ('+titles[chosen]+')</summary><div style="padding-top:12px">'+records[chosen].slice().reverse().map(([year,k])=>'<div class="item"><b>'+year+'</b> · '+(k?esc(teams[k])+' — '+esc(people[k]):'The Caronavirus (no tournament champion)')+'</div>').join('')+'</div></details>';
  detailEl.appendChild(card);
  }
 }
