@@ -1,9 +1,9 @@
 /* Historical KingCup champions, supplied by commissioner. Read-only; does not change season scoring. */
 (()=>{
 const teams={
- Z:"Ziggies",C:"The Caucasians",B:"B-Rad Ballerz",S:"Show Me Your TD's",T:"Turndog Troubadours",R:"Redbirds",E:"BEASts",I:"In a Pickle Bickell",J:"Satch"
+ Z:"Ziggies",C:"The Caucasians",B:"B-Rad Ballerz",S:"Show Me Your TD's",T:"Turndog Troubadours",R:"Redbirds",E:"BEASts",I:"In a Pickle Bickell",J:"Satch",P:"Powerhouse Honkey"
 };
-const people={Z:"Brian Zwanziger",C:"Kevin Jones",B:"Brad Ethridge",S:"Chris Elliot",T:"Matt Turner",R:"Josh Calavan",E:"Geoff Beasley",I:"Joe Bickell",J:"Josh Morris"};
+const people={Z:"Brian Zwanziger",C:"Kevin Jones",B:"Brad Ethridge",S:"Chris Elliot",T:"Matt Turner",R:"Josh Calavan",E:"Geoff Beasley",I:"Joe Bickell",J:"Josh Morris",P:"Nicholas"};
 const records={
  e0:[[2016,"S"],[2017,"Z"],[2018,"C"],[2019,"B"],[2020,"C"],[2021,"Z"],[2022,"R"],[2023,"T"],[2024,"S"],[2025,"Z"]],
  e5:[[2017,"S"],[2018,"B"],[2019,"B"],[2020,"C"],[2021,"T"],[2022,"T"],[2023,"S"],[2024,"B"],[2025,"C"]],
