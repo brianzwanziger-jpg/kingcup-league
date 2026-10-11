@@ -23,7 +23,7 @@ function showHistory(){
  const won=key?all.filter(x=>x.key===key):[];
  return {m,won};
  }).sort((a,b)=>b.won.length-a.won.length||a.m.name.localeCompare(b.m.name));
- home.innerHTML='<div class="card champ"><h2>🏆 All-Time Trophy Leaders</h2><p class="note">Championships won across all six competitions, ranked by total trophies. Tap any manager to see the trophy years.</p></div><div class="card">'+members.map((x,i)=>{
+ home.innerHTML='<div class="card"><h2>🏆 Trophy Rankings</h2><p class="note">Ranked by total trophies won. Tap a manager to view championships by competition.</p>'+members.map((x,i)=>{
  const years=Object.keys(titles).map(event=>{const wonYears=x.won.filter(w=>w.event===event).map(w=>w.year).sort((a,b)=>a-b);return '<div style="padding:5px 0"><b>'+esc(titles[event])+'</b>'+(wonYears.length?': '+wonYears.join(', '):'')+'</div>'}).join('');
  return '<div class="item" style="padding:12px 0"><div class="row between"><b>'+(i+1)+'. '+esc(x.m.name)+'</b><b style="color:#f4d381">🏆 '+x.won.length+'</b></div><details class="kc-trophy" style="margin-top:8px"><summary style="cursor:pointer;color:#f4d381;font-weight:700">View trophies ▾</summary><div style="padding:8px 0">'+years+'</div></details></div>';
  }).join('')+'</div>';
