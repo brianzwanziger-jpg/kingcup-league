@@ -21,7 +21,7 @@ function showHistory(){
  const name=row.querySelector('.grow b')?.textContent;const key=Object.keys(teams).find(k=>norm(teams[k])===norm(name));if(!key||row.querySelector('.kc-trophy'))return;
  const won=all.filter(x=>x.key===key).sort((a,b)=>b.year-a.year);
  const el=document.createElement('details');el.className='kc-trophy';el.style.cssText='margin:9px 0 2px;font-size:14px';
- el.innerHTML='<summary style="cursor:pointer;color:#f4d381;font-weight:800;display:list-item;padding:7px 10px;background:#28463a;border:1px solid #a88949;border-radius:9px;max-width:260px">🏆 '+won.length+' '+(won.length===1?'Trophy':'Trophies')+' · Tap to view</summary><div style="padding:8px 0">'+(won.length?won.map(x=>'<div style="padding:4px 0">'+x.year+' · '+esc(titles[x.event])+'</div>').join(''):'No past championships recorded')+'</div>';
+ el.innerHTML='<summary style="cursor:pointer;color:#f4d381;font-weight:800;display:list-item;padding:7px 10px;background:#28463a;border:1px solid #a88949;border-radius:9px;max-width:260px">🏆 '+won.length+' '+(won.length===1?'Trophy':'Trophies')+' · Tap to view</summary><div style="padding:8px 0">'+Object.keys(titles).map(event=>{const years=won.filter(x=>x.event===event).map(x=>x.year).sort((a,b)=>a-b);return '<div style="padding:5px 0"><b>'+esc(titles[event])+'</b>'+(years.length?': '+years.join(', '):'')+'</div>'}).join('')+'</div>';
  row.querySelector('.grow')?.appendChild(el);
  })}}
  const detailEl=document.getElementById('eventDetail');if(detailEl&&chosen&&records[chosen]&&!detailEl.querySelector('.kc-history')){
