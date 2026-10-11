@@ -17,13 +17,23 @@ const all=Object.entries(records).flatMap(([event,rs])=>rs.filter(([year,k])=>k)
 const norm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 function showHistory(){
  const home=document.getElementById('home');
- if(home){const card=home.querySelector('.card:nth-child(2)');if(card){const rows=[...card.querySelectorAll('.item.row')];rows.forEach(row=>{
- const name=row.querySelector('.grow b')?.textContent;const key=Object.keys(teams).find(k=>norm(teams[k])===norm(name));if(!key||row.querySelector('.kc-trophy'))return;
- const won=all.filter(x=>x.key===key).sort((a,b)=>b.year-a.year);
- const el=document.createElement('details');el.className='kc-trophy';el.style.cssText='margin:9px 0 2px;font-size:14px';
- el.innerHTML='<summary style="cursor:pointer;color:#f4d381;font-weight:800;display:list-item;padding:7px 10px;background:#28463a;border:1px solid #a88949;border-radius:9px;max-width:260px">🏆 '+won.length+' '+(won.length===1?'Trophy':'Trophies')+' · Tap to view</summary><div style="padding:8px 0">'+Object.keys(titles).map(event=>{const years=won.filter(x=>x.event===event).map(x=>x.year).sort((a,b)=>a-b);return '<div style="padding:5px 0"><b>'+esc(titles[event])+'</b>'+(years.length?': '+years.join(', '):'')+'</div>'}).join('')+'</div>';
- row.querySelector('.grow')?.appendChild(el);
- })}}
+ if(home){
+ const members=(Array.isArray(data.members)?data.members:[]).map(m=>{
+ const key=Object.keys(teams).find(k=>norm(teams[k])===norm(m.name));
+ const won=key?all.filter(x=>x.key===key):[];
+ return {m,won};
+ }).sort((a,b)=>b.won.length-a.won.length||a.m.name.localeCompare(b.m.name));
+ home.innerHTML='<div class="card champ"><h2>🏆 All-Time Trophy Leaders</h2><p class="note">Championships won across all six competitions, ranked by total trophies. Tap any manager to see the trophy years.</p></div><div class="card">'+members.map((x,i)=>{
+ const years=Object.keys(titles).map(event=>{const wonYears=x.won.filter(w=>w.event===event).map(w=>w.year).sort((a,b)=>a-b);return '<div style="padding:5px 0"><b>'+esc(titles[event])+'</b>'+(wonYears.length?': '+wonYears.join(', '):'')+'</div>'}).join('');
+ return '<div class="item" style="padding:12px 0"><div class="row between"><b>'+(i+1)+'. '+esc(x.m.name)+'</b><b style="color:#f4d381">🏆 '+x.won.length+'</b></div><details class="kc-trophy" style="margin-top:8px"><summary style="cursor:pointer;color:#f4d381;font-weight:700">View trophies ▾</summary><div style="padding:8px 0">'+years+'</div></details></div>';
+ }).join('')+'</div>';
+ }
+ const race=document.getElementById('race');
+ if(race&&!race.querySelector('.kc-kingcup-history')){
+ const card=document.createElement('div');card.className='card kc-kingcup-history';card.style.marginTop='14px';
+ card.innerHTML='<h2>🏆 Past KingCup Winners</h2>'+records.e4.slice().reverse().map(([year,k])=>'<div class="item row between"><b>'+year+'</b><span>'+esc(teams[k])+' — '+esc(people[k])+'</span></div>').join('')+'<p class="note">2016: No champion recorded.</p>';
+ race.appendChild(card);
+ }
  const detailEl=document.getElementById('eventDetail');if(detailEl&&chosen&&records[chosen]&&!detailEl.querySelector('.kc-history')){
  const card=document.createElement('div');card.className='card kc-history';card.style.marginTop='14px';
  card.innerHTML='<details><summary style="cursor:pointer;font-weight:700">🏆 Past Champions ('+titles[chosen]+')</summary><div style="padding-top:12px">'+records[chosen].slice().reverse().map(([year,k])=>'<div class="item"><b>'+year+'</b> · '+(k?esc(teams[k])+' — '+esc(people[k]):'The Caronavirus (no tournament champion)')+'</div>').join('')+(chosen==='e5'?'<p class="note">2016: No winner supplied.</p>':'')+(chosen==='e4'?'<p class="note">2016: Marked “x” in historical records; no champion assigned.</p>':'')+'</div></details>';
