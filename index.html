@@ -71,7 +71,7 @@ function yahooDetail(){
 }
 async function connectYahoo(){
  if(!session?.access_token)return toast('Sign in as commissioner first');
- try{const r=await fetch(cfg.url.replace(/\\/$/,'')+'/functions/v1/yahoo-connect',{headers:{Authorization:'Bearer '+session.access_token,apikey:cfg.anonKey}});const d=await r.json();if(!r.ok||!d.url)throw Error(d.error||'Could not start Yahoo connection');window.location.assign(d.url)}catch(e){yahooError=e.message;yahooDetail()}
+ try{const r=await fetch(cfg.url.replace(/\/$/,'')+'/functions/v1/yahoo-connect',{headers:{Authorization:'Bearer '+session.access_token,apikey:cfg.anonKey}});const d=await r.json();if(!r.ok||!d.url)throw Error(d.error||'Could not start Yahoo connection');window.location.assign(d.url)}catch(e){yahooError=e.message;yahooDetail()}
 }
 async function refreshYahoo(){
  if(!cfg.yahooSyncUrl||yahooLoading)return;
