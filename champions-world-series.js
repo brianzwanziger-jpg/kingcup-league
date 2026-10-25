@@ -38,7 +38,36 @@ async function panel(){
  try{
   const status=await call('cc_world_series_status',{},true);
   if(!status){
-   area.innerHTML='<label>First World Series team</label><input id="ccTeamA" placeholder="Team A"><label>Second World Series team</label><input id="ccTeamB" placeholder="Team B"><label>Deadline to submit picks (local time)</label><input id="ccDeadline" type="datetime-local"><p class="note">Set a future deadline. Ideally, picks close before the next World Series game begins. Creating links does not send messages automatically.</p><button id="ccCreate" class="full">Create private World Series links</button><p id="ccNotice" role="status"></p>';
+   area.innerHTML='<h3>Choose the next World Series game from ESPN</h3><label>MLB game date</label><input id="ccEspnDate" type="date"><button id="ccEspnFind" class="secondary full">Find ESPN baseball games</button><div id="ccEspnResults" class="item"><p class="note">Choose the next World Series game to automatically enter the two teams and set the deadline 5 minutes before first pitch. You can adjust the deadline below.</p></div><label>First World Series team</label><input id="ccTeamA" placeholder="Team A"><label>Second World Series team</label><input id="ccTeamB" placeholder="Team B"><label>Pick deadline (local time, before the next game)</label><input id="ccDeadline" type="datetime-local"><p class="note">The deadline locks all managers’ picks. Each manager can save or change their prediction before it, but not afterward. Creating links does not send messages automatically.</p><button id="ccCreate" class="full">Create private World Series links</button><p id="ccNotice" role="status"></p>';
+   const today=new Date();const tomorrow=new Date(today);tomorrow.setDate(today.getDate()+1);area.querySelector('#ccEspnDate').value=tomorrow.getFullYear()+'-'+String(tomorrow.getMonth()+1).padStart(2,'0')+'-'+String(tomorrow.getDate()).padStart(2,'0');
+   area.querySelector('#ccEspnFind').onclick=async()=>{
+    const status=area.querySelector('#ccEspnResults'),date=area.querySelector('#ccEspnDate').value;
+    if(!date)return status.textContent='Select a game date.';
+    status.textContent='Loading ESPN baseball schedule…';
+    try{
+     const resp=await fetch('https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates='+date.replace(/-/g,'')+'&limit=100');
+     if(!resp.ok)throw Error('ESPN is unavailable.');
+     const json=await resp.json();
+     const events=(json.events||[]).map(event=>{
+      const game=event.competitions?.[0];const opponents=game?.competitors||[];
+      const a=opponents.find(x=>x.homeAway==='away'),h=opponents.find(x=>x.homeAway==='home');
+      return {away:a?.team?.displayName,home:h?.team?.displayName,kickoff:event.date,name:event.name,completed:event.status?.type?.completed,notes:game?.notes?.map(n=>n.headline).join(' ')||''};
+     }).filter(x=>x.away&&x.home&&x.kickoff&&!x.completed);
+     if(!events.length){status.innerHTML='<p class="note">No upcoming games were returned for this date. Try another date or enter teams and deadline manually.</p>';return}
+     status.innerHTML='<p class="note">Choose the confirmed next World Series matchup. ESPN may also include other MLB games.</p><select id="ccEspnGame"><option value="">Choose a baseball game</option>'+events.map((x,i)=>'<option value="'+i+'">'+safe(x.away)+' at '+safe(x.home)+' — '+safe(new Date(x.kickoff).toLocaleString())+'</option>').join('')+'</select><button id="ccEspnUse" class="secondary full">Use this matchup and deadline</button><p id="ccEspnChosen" class="note"></p>';
+     status.querySelector('#ccEspnUse').onclick=()=>{
+      const selected=status.querySelector('#ccEspnGame').value;
+      if(selected==='')return toast('Choose a game first');
+      const game=events[Number(selected)],start=new Date(game.kickoff),deadline=new Date(start.getTime()-5*60000);
+      if(deadline<=new Date())return toast('This game is too close to first pitch. Select a future game.');
+      area.querySelector('#ccTeamA').value=game.away;
+      area.querySelector('#ccTeamB').value=game.home;
+      area.querySelector('#ccDeadline').value=new Date(deadline.getTime()-deadline.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      status.querySelector('#ccEspnChosen').textContent='Selected '+game.away+' vs '+game.home+'. Picks lock '+deadline.toLocaleString()+' (5 minutes before first pitch).';
+      toast('Matchup and pick deadline set');
+     };
+    }catch(err){status.textContent='Could not load ESPN baseball games: '+err.message+'. Enter both teams and the deadline manually.'}
+   };
    root.querySelector('#ccCreate').onclick=async()=>{
     const a=root.querySelector('#ccTeamA').value.trim(),b=root.querySelector('#ccTeamB').value.trim(),raw=root.querySelector('#ccDeadline').value;
     const d=new Date(raw);
