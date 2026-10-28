@@ -41,6 +41,7 @@ function privatePanel(){
  return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+
  (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&session&&locked&&status?'<button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">📲 Text All Picks — Week '+safe(w.week)+'</button>':'')+
+ (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
  (editing&&status?'<details open><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
  }).join('')+'</details>'+ 
  (editing&&session?'<h3>ESPN College GameDay matchup</h3><p class="note">Check ESPN’s announcement first, then find the confirmed game in its schedule. No invitations are sent automatically.</p><a href="https://espnpressroom.com/" target="_blank" rel="noopener">ESPN announcements ↗</a><label>Game date</label><input id="espnDate" type="date"><button id="espnFind" class="secondary full">Find ESPN matchups</button><div id="espnStatus"></div><h3>Create a private week</h3><p class="note">Choose a future kickoff. Each manager receives a unique link. Copy the links immediately: for security, they are displayed only when created.</p><label>Week number</label><input id="privWeek" type="number" min="1" step="1"><label>Away team</label><input id="privAway"><label>Home team</label><input id="privHome"><label>Kickoff (your local time)</label><input id="privKickoff" type="datetime-local"><button id="privCreate" class="full">Create private manager links</button><div id="privResult"></div><button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
@@ -58,6 +59,22 @@ function privatePanel(){
    return m.name+': '+(p?.pick||'No pick');
   }).join('\n\n');
   location.href='sms://open?addresses='+recipients.join(',')+';?&body='+encodeURIComponent(message);
+ });
+ root.querySelectorAll('[data-cancel-gd-week]').forEach(b=>b.onclick=async()=>{
+  const week=Number(b.dataset.cancelGdWeek),pickNo=Number(b.dataset.cancelGdPick);
+  const match=weeks.find(w=>Number(w.week)===week&&Number(w.pick_no||1)===pickNo);
+  const status=adminWeeks.find(w=>Number(w.week)===week&&Number(w.pick_no||1)===pickNo);
+  if(!match||Date.now()>=Date.parse(match.kickoff))return toast('This matchup has already kicked off and cannot be canceled.');
+  const submitted=status?.members?.filter(m=>m.submitted).length||0;
+  const description='Week '+week+' — Pick '+pickNo+': '+match.away+' vs '+match.home;
+  if(!confirm('CANCEL '+description+'?\n\nAll existing links will stop working. '+submitted+' already submitted pick(s) will be deleted.\n\nYou must create a NEW matchup and send NEW links to everyone. Week '+week+' other picks will not be affected.'))return;
+  b.disabled=true;
+  try{
+   const v=await rpc('gd_cancel_pick',{p_week:week,p_pick_no:pickNo},true);
+   createdLinks=createdLinks.filter(l=>!(Number(l.week)===week&&Number(l.pick_no||1)===pickNo));
+   await refreshPrivate();
+   toast('Week '+week+' Pick '+pickNo+' canceled. Create the replacement and send new links.');
+  }catch(err){toast('Cancel failed: '+err.message);b.disabled=false}
  });
  root.querySelectorAll('[data-resend-week]').forEach(b=>b.onclick=async()=>{
   const week=Number(b.dataset.resendWeek),pickNo=Number(b.dataset.resendPick||1),id=b.dataset.resendMember;
