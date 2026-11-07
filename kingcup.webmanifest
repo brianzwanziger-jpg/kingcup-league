@@ -1,0 +1,18 @@
+{
+  "name": "KingCup League",
+  "short_name": "KingCup",
+  "id": "/kingcup-league/",
+  "start_url": "/kingcup-league/",
+  "scope": "/kingcup-league/",
+  "display": "standalone",
+  "background_color": "#0a1715",
+  "theme_color": "#102b25",
+  "icons": [
+    {
+      "src": "kingcup-push-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
