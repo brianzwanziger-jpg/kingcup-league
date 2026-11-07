@@ -82,6 +82,7 @@ function privatePanel(){
   if(!confirm('Resend this week’s link? Their previous link will stop working, but their saved pick will remain.'))return;
   b.disabled=true;
   try{const l=await rpc('gd_resend_pick',{p_week:week,p_pick_no:pickNo,p_member_id:id},true);
+   await window.kcGameDayPublish?.([{id:l.id,token:l.token,week,pick_no:pickNo}]);
    smsLink({id:l.id,name:l.name,week:l.week,away:l.away,home:l.home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)});
   }catch(err){toast(err.message)}finally{b.disabled=false}
  });
@@ -99,6 +100,7 @@ function privatePanel(){
  try{
  const links=await rpc('gd_create_week',{p_week:week,p_away:away,p_home:home,p_kickoff:kickoff.toISOString(),p_members:data.members.map(m=>({id:m.id,name:m.name}))},true);
  createdLinks=links.map(l=>({id:l.id,name:l.name,week,away,home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)}));
+ const queued=await window.kcGameDayPublish?.(links.map(l=>({id:l.id,token:l.token,week,pick_no:1})));if(queued)toast('Links created; manager push notifications queued');
  const result=root.querySelector('#privResult');
  linkButtons(result);
  weeks=await rpc('gd_public_weeks');adminWeeks=await rpc('gd_admin_status',{},true);
