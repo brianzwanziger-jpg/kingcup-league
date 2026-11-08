@@ -42,14 +42,16 @@ async function enable(){
  finally{if(button)button.disabled=false}
 }
 function managerUI(){
+ // Show the manager registration and personal picks only inside the GameDay tab.
+ if(typeof tab==='undefined'||tab!=='events'||chosen!=='e5')return;
  if(document.getElementById('kcManagerSetup'))return;
- const main=document.querySelector('main.wrap');if(!main)return;
- const c=document.createElement('section');c.id='kcManagerSetup';c.className='card';
+ const destination=document.getElementById('eventDetail');if(!destination||!destination.parentElement)return;
+ const c=document.createElement('div');c.id='kcManagerSetup';c.className='card';
  const existing=!!localStorage.getItem(savedKey);
  c.innerHTML='<details '+(existing?'':'')+'><summary style="cursor:pointer;font-weight:750;font-size:17px">🔔 GameDay pick notifications '+(existing?'✓':'')+'</summary><p class="note">Get your new GameDay picks and one reminder if you are missing a pick. On iPhone, open KingCup from its Home Screen icon.</p>'+
  '<label for="kcManagerCode">Your personal setup code (commissioner provides once)</label><input id="kcManagerCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your private setup code" value="'+safe(localStorage.getItem(savedKey)||'')+'">'+
  '<button type="button" id="kcManagerEnable" class="full" style="margin-top:9px">Enable my GameDay notifications</button><p class="note" role="status" id="kcManagerStatus">'+(existing?'This device has previously been registered.':'Only your own GameDay picks will be displayed.')+'</p></details><div id="kcManagerPicks" style="margin-top:10px"></div>';
- main.prepend(c);c.querySelector('#kcManagerEnable').addEventListener('click',enable);loadPicks();
+ destination.parentElement.insertBefore(c,destination);c.querySelector('#kcManagerEnable').addEventListener('click',enable);loadPicks();
 }
 function commissionerUI(){
  if(!(typeof editing!=='undefined'&&editing&&session))return;
@@ -61,7 +63,7 @@ function commissionerUI(){
  const v=await call('setup-codes',{},true);const area=c.querySelector('#kcManagerCodeList');
  area.innerHTML='<p class="note">Share the matching code privately with each manager. These codes grant access to that manager’s GameDay picks.</p>'+
  v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p style="overflow-wrap:anywhere" class="note">'+safe(m.setup_code)+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy private setup message</button></div>').join('');
- area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='KingCup GameDay setup for '+m.member_name+': Open https://brianzwanziger-jpg.github.io/kingcup-league/ in Safari, Add to Home Screen, then open the KingCup icon. Under GameDay pick notifications, enter your personal code '+m.setup_code+' and tap Enable my GameDay notifications. Tap Allow. Keep this code private.';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — paste into a private text'}catch{alert(msg)}});
+ area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='KingCup GameDay setup for '+m.member_name+': Open https://brianzwanziger-jpg.github.io/kingcup-league/ in Safari, Add to Home Screen, then open the KingCup icon. Open the GameDay tab, then under GameDay pick notifications enter your personal code '+m.setup_code+' and tap Enable my GameDay notifications. Tap Allow. Keep this code private.';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — paste into a private text'}catch{alert(msg)}});
  }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
 }
 const observer=new MutationObserver(()=>{managerUI();commissionerUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();
