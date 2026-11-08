@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102b25"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="kingcup.webmanifest"><title>GameDay Kickoff Picks · KingCup League</title>
+<style> :root{font:16px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a1715;color:#eaf6ec}*{box-sizing:border-box}body{margin:0;padding:0 16px 60px}header{background:#102b25;margin:0 -16px 18px;padding:21px 16px;border-bottom:2px solid #d5ad55}h1{font-size:22px;margin:4px 0}.muted{color:#b6c9bd;font-size:13px}.wrap{max-width:680px;margin:auto}.card{background:#142923;border:1px solid #315045;border-radius:18px;padding:16px;margin:14px 0}a{color:#ffe09c}a.btn{display:inline-block;background:#d5ad55;color:#152a21;border-radius:10px;padding:11px 15px;text-decoration:none;font-weight:800}.item{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:13px 0;border-top:1px solid #315045}.item:first-child{border-top:0}.name{font-weight:700;overflow-wrap:anywhere}.pick{overflow-wrap:anywhere;text-align:right}.head{color:#d5ad55;font-size:12px;text-transform:uppercase;letter-spacing:1.2px}button{cursor:pointer;padding:9px 13px;background:#294c3e;border:0;border-radius:9px;color:white}</style></head>
+<body><header><div class="wrap"><div class="head">KINGCUP LEAGUE</div><h1>🏈 GameDay Kickoff Picks</h1><div class="muted">Everyone’s selections, revealed at kickoff</div></div></header>
+<main class="wrap"><div id="status" class="card">Loading GameDay results…</div><div id="result"></div><p><a class="btn" href="./">Open KingCup</a></p></main>
+<script>
+const endpoint='https://jtptfoujwxqgqhcezndb.supabase.co/functions/v1/kingcup-push';
+const qs=new URLSearchParams(location.search),week=Number(qs.get('week')),pick=Number(qs.get('pick'));
+const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function show(){
+ const status=document.getElementById('status'),el=document.getElementById('result');
+ if(!Number.isInteger(week)||week<1||!Number.isInteger(pick)||pick<1){status.textContent='Invalid GameDay matchup';return}
+ try{
+ const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kickoff-results',week,pick_no:pick})});
+ const d=await r.json();if(!r.ok)throw Error(d.error||'Could not load picks');
+ status.innerHTML='<h2>Week '+safe(d.week)+' — Pick '+safe(d.pick_no)+'</h2><p>'+safe(d.away)+' vs '+safe(d.home)+'</p><div class="muted">Kickoff: '+safe(new Date(d.kickoff).toLocaleString())+'</div>';
+ el.innerHTML='<section class="card"><h2>All managers’ picks</h2>'+d.picks.map(x=>'<div class="item"><div class="name">'+safe(x.name)+'</div><div class="pick">'+safe(x.pick||'No pick')+'</div></div>').join('')+'</section>';
+ }catch(e){status.textContent=e.message||'Unable to load GameDay picks'}
+}
+show();
+</script></body></html>
