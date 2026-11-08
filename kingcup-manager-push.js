@@ -22,48 +22,65 @@ async function loadPicks(){
  }catch(e){root.textContent='Could not load your picks: '+e.message}
 }
 async function enable(){
- const button=document.getElementById('kcManagerEnable'),status=document.getElementById('kcManagerStatus');
- if(button)button.disabled=true;
+ const btn=document.getElementById('kcManagerEnable'),status=document.getElementById('kcManagerStatus');
+ if(btn)btn.disabled=true;
  try{
-  const code=(document.getElementById('kcManagerCode')?.value||'').trim().toLowerCase();
-  if(!/^[a-f0-9]{36}$/.test(code))throw Error('Enter your personal setup code from the commissioner.');
-  if(!hasPush())throw Error('This browser does not support push. On iPhone, use KingCup from your Home Screen.');
-  if(!isHome())throw Error('On iPhone, open KingCup using its Home Screen icon, not Safari.');
+  const member_id=document.getElementById('kcManagerTeam')?.value;
+  const pin=(document.getElementById('kcManagerPin')?.value||'').trim();
+  if(!member_id)throw Error('Select your team name first.');
+  if(!/^[0-9]{6}$/.test(pin))throw Error('Enter your 6-digit PIN.');
+  if(!hasPush())throw Error('Push is unavailable here. On iPhone open KingCup from its Home Screen.');
+  if(!isHome())throw Error('Open KingCup from its Home Screen icon, not Safari.');
   const permission=await Notification.requestPermission();
-  if(permission!=='granted')throw Error('Allow notifications in iPhone Settings to receive GameDay updates.');
+  if(permission!=='granted')throw Error('Tap Allow for notifications, or enable them in iPhone Settings.');
   const key=await call('manager-public-key');
   const worker=await navigator.serviceWorker.register('./kingcup-push-sw.js');
   const subscription=await worker.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes(key.publicKey)});
-  const result=await call('manager-register',{code,subscription:subscription.toJSON()});
-  localStorage.setItem(savedKey,code);
-  if(status)status.textContent='✓ Notifications enabled for '+result.name+'.';
+  const response=await call('manager-activate',{member_id,pin,subscription:subscription.toJSON()});
+  localStorage.setItem(savedKey,response.code);
+  const panel=document.getElementById('kcManagerSetup');
+  if(panel)panel.remove();
+  managerUI();
   await loadPicks();
- }catch(e){if(status)status.textContent=e.message||'Could not enable notifications.'}
- finally{if(button)button.disabled=false}
+ }catch(err){if(status)status.textContent=err.message||'Notification setup failed.'}
+ finally{if(btn)btn.disabled=false}
+}
+async function showTeams(){
+ const select=document.getElementById('kcManagerTeam');if(!select)return;
+ try{
+  const v=await call('manager-names');
+  if(!document.getElementById('kcManagerTeam'))return;
+  select.innerHTML='<option value="">Select your team</option>'+v.managers.map(m=>'<option value="'+safe(m.id)+'">'+safe(m.name)+'</option>').join('');
+ }catch(e){select.innerHTML='<option value="">Unable to load team names</option>';const label=document.getElementById('kcManagerStatus');if(label)label.textContent=e.message}
 }
 function managerUI(){
- // Show the manager registration and personal picks only inside the GameDay tab.
  if(typeof tab==='undefined'||tab!=='events'||chosen!=='e5')return;
  if(document.getElementById('kcManagerSetup'))return;
- const destination=document.getElementById('eventDetail');if(!destination||!destination.parentElement)return;
- const c=document.createElement('div');c.id='kcManagerSetup';c.className='card';
+ const destination=document.getElementById('eventDetail');if(!destination?.parentElement)return;
+ const c=document.createElement('section');c.id='kcManagerSetup';c.className='card';
  const existing=!!localStorage.getItem(savedKey);
- c.innerHTML='<details '+(existing?'':'')+'><summary style="cursor:pointer;font-weight:750;font-size:17px">🔔 GameDay pick notifications '+(existing?'✓':'')+'</summary><p class="note">Get your new GameDay picks and one reminder if you are missing a pick. On iPhone, open KingCup from its Home Screen icon.</p>'+
- '<label for="kcManagerCode">Your personal setup code (commissioner provides once)</label><input id="kcManagerCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your private setup code" value="'+safe(localStorage.getItem(savedKey)||'')+'">'+
- '<button type="button" id="kcManagerEnable" class="full" style="margin-top:9px">Enable my GameDay notifications</button><p class="note" role="status" id="kcManagerStatus">'+(existing?'This device has previously been registered.':'Only your own GameDay picks will be displayed.')+'</p></details><div id="kcManagerPicks" style="margin-top:10px"></div>';
- destination.parentElement.insertBefore(c,destination);c.querySelector('#kcManagerEnable').addEventListener('click',enable);loadPicks();
+ c.innerHTML=existing
+ ? '<h2>🏈 My GameDay Picks <span style="font-size:13px;color:#a4d8b1">✓ Notifications enabled</span></h2><p class="note">Your existing setup is saved. No further action needed.</p><div id="kcManagerPicks"></div>'
+ : '<h2>🔔 GameDay pick notifications</h2><p class="note">One-time setup: choose your team, enter your 6-digit PIN and allow notifications.</p>'+
+ '<label for="kcManagerTeam">Your team</label><select id="kcManagerTeam"><option value="">Loading teams…</option></select>'+
+ '<label for="kcManagerPin">Your 6-digit PIN (from the commissioner)</label><input id="kcManagerPin" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="6-digit PIN">'+
+ '<button type="button" id="kcManagerEnable" class="full" style="margin-top:10px">Enable Notifications</button>'+
+ '<p class="note" role="status" id="kcManagerStatus">You only need to do this once.</p><div id="kcManagerPicks"></div>';
+ destination.parentElement.insertBefore(c,destination);
+ if(existing)loadPicks();
+ else{c.querySelector('#kcManagerEnable').addEventListener('click',enable);showTeams();}
 }
 function commissionerUI(){
  if(!(typeof editing!=='undefined'&&editing&&session))return;
  const root=document.getElementById('manage');if(!root||document.getElementById('kcManagerCodesAdmin'))return;
  const c=document.createElement('section');c.className='card';c.id='kcManagerCodesAdmin';
- c.innerHTML='<h2>Manager GameDay notifications</h2><p class="note">Generate each manager’s private, permanent setup code. Send each code privately once, never to the group. Managers then receive personalized picks and reminders automatically after you create each matchup.</p><button id="kcGetManagerCodes" class="full">View manager setup codes and registration status</button><div id="kcManagerCodeList"></div>';
+ c.innerHTML='<h2>Manager GameDay notifications</h2><p class="note">Each manager selects their team and enters a personal 6-digit PIN once. Existing registrations keep working. Send each manager their PIN privately.</p><button id="kcGetManagerCodes" class="full">View manager PINs and registration status</button><div id="kcManagerCodeList"></div>';
  root.prepend(c);
  c.querySelector('#kcGetManagerCodes').onclick=async()=>{const b=c.querySelector('#kcGetManagerCodes');b.disabled=true;try{
  const v=await call('setup-codes',{},true);const area=c.querySelector('#kcManagerCodeList');
- area.innerHTML='<p class="note">Share the matching code privately with each manager. These codes grant access to that manager’s GameDay picks.</p>'+
- v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p style="overflow-wrap:anywhere" class="note">'+safe(m.setup_code)+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy setup code</button></div>').join('');
- area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='Here is your personal code. Copy and paste it in the app.\n\n'+m.setup_code;try{await navigator.clipboard.writeText(msg);btn.textContent='Code copied — send privately'}catch{alert(msg)}});
+ area.innerHTML='<p class="note">Send each PIN privately. The manager selects their team in the GameDay tab and enters these 6 digits.</p>'+
+ v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p class="note" style="font-size:20px;letter-spacing:3px;font-weight:750">'+safe(m.activation_pin||'PIN unavailable')+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy PIN message</button></div>').join('');
+ area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='Your KingCup GameDay PIN is '+m.activation_pin+'. Open KingCup → GameDay, select '+m.member_name+', enter the PIN and tap Enable Notifications. Tap Allow. If you already enabled notifications, you do not need to do anything.';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — send privately'}catch{alert(msg)}});
  }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
 }
 const observer=new MutationObserver(()=>{managerUI();commissionerUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();
