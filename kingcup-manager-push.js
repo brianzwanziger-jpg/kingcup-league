@@ -63,7 +63,7 @@ function commissionerUI(){
  const v=await call('setup-codes',{},true);const area=c.querySelector('#kcManagerCodeList');
  area.innerHTML='<p class="note">Share the matching code privately with each manager. These codes grant access to that manager’s GameDay picks.</p>'+
  v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p style="overflow-wrap:anywhere" class="note">'+safe(m.setup_code)+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy setup code</button></div>').join('');
- area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg=m.setup_code;try{await navigator.clipboard.writeText(msg);btn.textContent='Code copied — send privately'}catch{alert(msg)}});
+ area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='Here is your personal code. Copy and paste it in the app.\n\n'+m.setup_code;try{await navigator.clipboard.writeText(msg);btn.textContent='Code copied — send privately'}catch{alert(msg)}});
  }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
 }
 const observer=new MutationObserver(()=>{managerUI();commissionerUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();
