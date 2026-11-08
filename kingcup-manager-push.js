@@ -62,8 +62,8 @@ function commissionerUI(){
  c.querySelector('#kcGetManagerCodes').onclick=async()=>{const b=c.querySelector('#kcGetManagerCodes');b.disabled=true;try{
  const v=await call('setup-codes',{},true);const area=c.querySelector('#kcManagerCodeList');
  area.innerHTML='<p class="note">Share the matching code privately with each manager. These codes grant access to that manager’s GameDay picks.</p>'+
- v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p style="overflow-wrap:anywhere" class="note">'+safe(m.setup_code)+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy private setup message</button></div>').join('');
- area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='KingCup GameDay setup for '+m.member_name+': Open https://brianzwanziger-jpg.github.io/kingcup-league/ in Safari, Add to Home Screen, then open the KingCup icon. Open the GameDay tab, then under GameDay pick notifications enter your personal code '+m.setup_code+' and tap Enable my GameDay notifications. Tap Allow. Keep this code private.';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — paste into a private text'}catch{alert(msg)}});
+ v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p style="overflow-wrap:anywhere" class="note">'+safe(m.setup_code)+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy setup code</button></div>').join('');
+ area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg=m.setup_code;try{await navigator.clipboard.writeText(msg);btn.textContent='Code copied — send privately'}catch{alert(msg)}});
  }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
 }
 const observer=new MutationObserver(()=>{managerUI();commissionerUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();
