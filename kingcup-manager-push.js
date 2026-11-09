@@ -83,6 +83,51 @@ function commissionerUI(){
  area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='🏈 KingCup GameDay\n\nTeam: '+m.member_name+'\nPIN: '+m.activation_pin+'\n\n1. Open KingCup → GameDay.\n2. Select your team and enter your PIN.\n3. Tap Enable Notifications, then Allow.\n\nAlready set up? You’re all done!';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — send privately'}catch{alert(msg)}});
  }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
 }
-const observer=new MutationObserver(()=>{managerUI();commissionerUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();
+function commissionerBroadcastUI(){
+ if(!(typeof editing!=='undefined'&&editing&&session))return;
+ const root=document.getElementById('manage');
+ if(!root||document.getElementById('kcBroadcastAdmin'))return;
+ const panel=document.createElement('section');
+ panel.id='kcBroadcastAdmin';panel.className='card';
+ panel.innerHTML='<h2>📣 Send Push Notification</h2>'+
+ '<p class="note">Send a KingCup announcement to everyone or selected managers. Only registered devices receive it.</p>'+
+ '<label for="kcBroadcastTitle">Notification title</label><input id="kcBroadcastTitle" maxlength="90" placeholder="Example: KingCup update">'+
+ '<label for="kcBroadcastBody">Your message</label><textarea id="kcBroadcastBody" maxlength="450" rows="4" placeholder="Type your announcement here"></textarea>'+
+ '<div style="margin:14px 0 8px"><b>Recipients</b></div>'+
+ '<label style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="kcBroadcastAll" checked style="width:auto"> Everyone</label>'+
+ '<div id="kcBroadcastMembers" style="margin:6px 0 14px" aria-label="Individual managers">Loading managers…</div>'+
+ '<button type="button" id="kcBroadcastSend" class="full">Review & Send Notification</button>'+
+ '<p class="note" id="kcBroadcastResult" role="status"></p>';
+ root.prepend(panel);
+ let managers=[];
+ const all=panel.querySelector('#kcBroadcastAll');
+ const list=panel.querySelector('#kcBroadcastMembers');
+ const status=panel.querySelector('#kcBroadcastResult');
+ const draw=()=>{
+  list.innerHTML=managers.map((m,i)=>'<label style="display:flex;align-items:center;gap:9px;margin:7px 0"><input type="checkbox" style="width:auto" data-kc-recipient="'+i+'" '+(all.checked?'checked disabled':'')+'><span>'+safe(m.name)+'</span><span class="note" style="margin-left:auto">'+(m.devices?'✓ Enabled':'Not registered')+'</span></label>').join('');
+ };
+ all.addEventListener('change',draw);
+ call('commissioner-push-targets',{},true).then(v=>{managers=v.managers||[];draw()}).catch(e=>{list.textContent='Unable to load managers: '+e.message});
+ panel.querySelector('#kcBroadcastSend').addEventListener('click',async()=>{
+  const btn=panel.querySelector('#kcBroadcastSend'),title=panel.querySelector('#kcBroadcastTitle').value.trim(),body=panel.querySelector('#kcBroadcastBody').value.trim();
+  if(!title||!body){status.textContent='Enter a title and message first.';return;}
+  if(!managers.length){status.textContent='Manager list is unavailable. Try reopening Manage.';return;}
+  const recipients=all.checked?managers:managers.filter((m,i)=>list.querySelector('[data-kc-recipient="'+i+'"]')?.checked);
+  if(!recipients.length){status.textContent='Select at least one manager.';return;}
+  const enabled=recipients.filter(m=>m.devices>0).length;
+  if(!enabled){status.textContent='None of the selected managers have registered notifications.';return;}
+  const preview='Send this KingCup notification?\n\n'+title+'\n'+body+'\n\nRecipients: '+recipients.map(m=>m.name).join(', ')+(enabled<recipients.length?'\n\n'+(recipients.length-enabled)+' selected managers are not registered and will not receive it.':'');
+  if(!confirm(preview))return;
+  btn.disabled=true;status.textContent='Sending…';
+  try{
+   const reqId=crypto.randomUUID();
+   const result=await call('commissioner-push-send',{request_id:reqId,title,body,member_ids:recipients.map(m=>m.id)},true);
+   status.textContent='Sent to '+result.delivered+' device'+(result.delivered===1?'':'s')+'.'+(result.failed?' '+result.failed+' failed.':'')+(result.unregistered?.length?' Not registered: '+result.unregistered.join(', ')+'.':'');
+   if(result.completed&&result.delivered){panel.querySelector('#kcBroadcastBody').value='';}
+  }catch(e){status.textContent='Notification was not confirmed: '+e.message+'. Check before attempting another send.';}
+  finally{btn.disabled=false;}
+ });
+}
+const observer=new MutationObserver(()=>{managerUI();commissionerUI();commissionerBroadcastUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();commissionerBroadcastUI();
 window.kcGameDayPublish=async links=>{if(!Array.isArray(links)||!links.length)return false;const input=links.map(l=>({week:Number(l.week),pick_no:Number(l.pick_no||1),id:String(l.id),token:String(l.token||'')}));try{await call('publish-links',{links:input},true);return true}catch(e){console.warn('GameDay push queuing failed:',e.message);alert('GameDay links were created, but automatic push delivery could not be queued: '+e.message+'. Please use the manual text links for these picks.');return false}};
 })();
