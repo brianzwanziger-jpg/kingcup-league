@@ -14,12 +14,39 @@ let showManager=false;
 async function loadPicks(){
  const code=localStorage.getItem(savedKey);if(!code)return;
  const root=document.getElementById('kcManagerPicks');if(!root)return;
- try{const v=await call('manager-picks',{code});
-  root.innerHTML='<b>🏈 '+safe(v.name)+' — Your GameDay picks</b><p class="note">Push notifications are linked to this phone. Choose your pending picks below.</p>'+
-  (v.picks.length?v.picks.map(p=>'<div class="item"><b>Week '+p.week+' — Pick '+p.pick_no+'</b><p class="note">'+safe(p.away)+' vs '+safe(p.home)+' · '+(p.submitted?'✓ Submitted':'Not submitted')+'</p><a class="btn" style="display:inline-block;text-decoration:none" href="'+safe(p.url)+'">'+(p.submitted?'View or change pick':'Make my pick')+'</a></div>').join(''):'<p class="note">No current GameDay matchups. You will be notified when new picks are published.</p>')+
-  '<button type="button" class="secondary" id="kcRefreshMyPicks">Refresh my picks</button>';
+ try{
+  const v=await call('manager-picks',{code});
+  if(!root.isConnected)return;
+  const picks=v.picks||[];
+  root.innerHTML='<h2>🏈 '+safe(v.name)+' — My GameDay Picks</h2>'+
+   (picks.length?'<p class="note">Choose your winners, then save both picks together. You can change either pick until its own kickoff.</p>'+
+   picks.map(p=>'<div class="item"><b>Week '+safe(p.week)+' — Pick '+safe(p.pick_no)+'</b>'+
+   '<p class="note">'+safe(p.away)+' vs '+safe(p.home)+' · '+(p.submitted?'✓ Submitted':'Not submitted')+
+   ' · Kickoff '+safe(new Date(p.kickoff).toLocaleString())+'</p>'+
+   '<select data-kc-week="'+safe(p.week)+'" data-kc-pick="'+safe(p.pick_no)+'" aria-label="Week '+safe(p.week)+' Pick '+safe(p.pick_no)+'"><option value="">Select a winner</option>'+
+   [p.away,p.home].map(name=>'<option value="'+safe(name)+'" '+(p.selection===name?'selected':'')+'>'+safe(name)+'</option>').join('')+
+   '</select></div>').join('')+
+   '<button type="button" id="kcSaveAllGameDay" class="full">Save My Picks</button>'+
+   '<p id="kcSaveAllStatus" class="note" role="status"></p>':
+   '<p class="note">No upcoming matchups. New GameDay picks will appear here automatically.</p>')+
+   '<button type="button" class="secondary" id="kcRefreshMyPicks">Refresh my picks</button>';
   root.querySelector('#kcRefreshMyPicks').onclick=loadPicks;
- }catch(e){root.textContent='Could not load your picks: '+e.message}
+  const save=root.querySelector('#kcSaveAllGameDay');
+  if(save)save.onclick=async()=>{
+   const selects=[...root.querySelectorAll('[data-kc-week][data-kc-pick]')];
+   const selected=selects.filter(el=>el.value).map(el=>({week:Number(el.dataset.kcWeek),pick_no:Number(el.dataset.kcPick),pick:el.value}));
+   const status=root.querySelector('#kcSaveAllStatus');
+   if(!selected.length){status.textContent='Choose at least one team.';return}
+   save.disabled=true;status.textContent='Saving your picks…';
+   try{
+    const result=await call('manager-batch-submit',{code,picks:selected});
+    status.textContent='✓ '+result.saved+' pick'+(result.saved===1?'':'s')+' saved.';
+    await loadPicks();
+    const updated=document.getElementById('kcManagerPicks');
+    if(updated){const p=document.createElement('p');p.className='note';p.textContent='✓ Your selections are saved.';updated.appendChild(p)}
+   }catch(e){status.textContent=e.message||'Unable to save';save.disabled=false}
+  };
+ }catch(e){if(root.isConnected)root.textContent='Could not load your picks: '+e.message}
 }
 async function enable(){
  const btn=document.getElementById('kcManagerEnable'),status=document.getElementById('kcManagerStatus');
