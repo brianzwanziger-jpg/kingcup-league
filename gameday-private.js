@@ -133,7 +133,7 @@ function testPanel(root){
 const original=gameDayDetail;
 gameDayDetail=function(e){original(e);const detail=$('eventDetail');if(detail)detail.appendChild(privatePanel())};
 async function invitePage(){
- document.body.innerHTML='<main style="max-width:600px;margin:32px auto;padding:18px;font:16px system-ui"><h1>🏈 KingCup GameDay</h1><div id="invContent">Loading private invitation…</div></main>';
+ document.body.innerHTML='<main style="max-width:600px;margin:32px auto;padding:18px;font:16px system-ui"><h1>🏈 KingCup GameDay</h1><div id="invContent">Loading private invitation…</div><a href="./#gameday" id="gdReturnToGameDay" style="display:block;text-align:center;margin:24px 0;padding:15px 20px;background:#214b3c;color:#fff;border-radius:12px;font-weight:700;text-decoration:none">← Return to GameDay</a></main>';
  const area=document.getElementById('invContent');
  async function load(){
  try{
