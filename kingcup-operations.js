@@ -45,32 +45,8 @@ function dashboard(e){
  section.querySelector('#kcOpsRefresh').onclick=load;
  load();
 }
-function archive(){
- const root=document.getElementById('eventDetail');if(!root||root.querySelector('#kcWeekArchive'))return;
- const section=document.createElement('details');section.id='kcWeekArchive';section.className='card';
- section.innerHTML='<summary style="font-size:18px;font-weight:750;cursor:pointer">📚 Past GameDay Weeks</summary><div id="kcArchivedRows" class="note">Loading past games…</div>';
- root.appendChild(section);
- (async()=>{
-  try{
-   const weeks=await rpcOps('gd_history_weeks'),now=Date.now(),latest=Math.max(0,...weeks.map(w=>Number(w.week)));
-   const savedGames=data.events.find(e=>e.id==='e5')?.gameday?.games||[];
-   const completedWeek=week=>{
-    const matchups=weeks.filter(x=>Number(x.week)===Number(week));
-    return matchups.length>0&&matchups.every(x=>savedGames.some(g=>Number(g.week)===Number(x.week)&&Number(g.pick_no||1)===Number(x.pick_no)&&!!g.winner));
-   };
-   const past=weeks.filter(w=>Date.parse(w.kickoff)<=now&&(Number(w.week)<latest||completedWeek(w.week)));
-   if(!section.isConnected)return;
-   section.querySelector('#kcArchivedRows').innerHTML=past.length?past.map(w=>
-    '<details class="item"><summary style="cursor:pointer"><b>Week '+escHtml(w.week)+' — Pick '+escHtml(w.pick_no)+' · '+escHtml(w.away)+' vs '+escHtml(w.home)+'</b></summary>'+
-    '<p class="note">Kickoff: '+escHtml(new Date(w.kickoff).toLocaleString())+
-    ' · Winner: '+escHtml(savedGames.find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===Number(w.pick_no))?.winner||'Awaiting official result')+'</p>'+
-    data.members.map(m=>'<div class="mini" style="padding:5px 0">'+escHtml(m.name)+': '+escHtml(w.picks?.[m.id]||'No pick')+'</div>').join('')+'</details>'
-    ).join(''):'<p class="note">Previous weeks will appear here after a new week is created.</p>';
-  }catch(err){if(section.isConnected)section.querySelector('#kcArchivedRows').textContent='Unable to load history: '+err.message}
- })();
-}
 const previous=gameDayDetail;
-gameDayDetail=function(e){previous(e);if(e.id!=='e5')return;if(isAdmin())dashboard(e);archive()};
+gameDayDetail=function(e){previous(e);if(e.id!=='e5')return;if(isAdmin())dashboard(e)};
 function backups(){
  if(!isAdmin())return;
  const root=document.getElementById('manage');if(!root||document.getElementById('kcOpsBackups'))return;
