@@ -70,19 +70,6 @@ function managerUI(){
  if(existing)loadPicks();
  else{c.querySelector('#kcManagerEnable').addEventListener('click',enable);showTeams();}
 }
-function commissionerUI(){
- if(!(typeof editing!=='undefined'&&editing&&session))return;
- const root=document.getElementById('manage');if(!root||document.getElementById('kcManagerCodesAdmin'))return;
- const c=document.createElement('section');c.className='card';c.id='kcManagerCodesAdmin';
- c.innerHTML='<h2>Manager GameDay notifications</h2><p class="note">Each manager selects their team and enters a personal 6-digit PIN once. Existing registrations keep working. Send each manager their PIN privately.</p><button id="kcGetManagerCodes" class="full">View manager PINs and registration status</button><div id="kcManagerCodeList"></div>';
- root.prepend(c);
- c.querySelector('#kcGetManagerCodes').onclick=async()=>{const b=c.querySelector('#kcGetManagerCodes');b.disabled=true;try{
- const v=await call('setup-codes',{},true);const area=c.querySelector('#kcManagerCodeList');
- area.innerHTML='<p class="note">Send each PIN privately. The manager selects their team in the GameDay tab and enters these 6 digits.</p>'+
- v.managers.map((m,i)=>'<div class="item"><b>'+safe(m.member_name)+'</b> — '+(m.enabled?'✓ Notifications enabled':'Not registered')+'<p class="note" style="font-size:20px;letter-spacing:3px;font-weight:750">'+safe(m.activation_pin||'PIN unavailable')+'</p><button type="button" class="secondary" data-kc-copy="'+i+'">Copy PIN message</button></div>').join('');
- area.querySelectorAll('[data-kc-copy]').forEach(btn=>btn.onclick=async()=>{const m=v.managers[Number(btn.dataset.kcCopy)];const msg='🏈 KingCup GameDay\n\nTeam: '+m.member_name+'\nPIN: '+m.activation_pin+'\n\n1. Open KingCup → GameDay.\n2. Select your team and enter your PIN.\n3. Tap Enable Notifications, then Allow.\n\nAlready set up? You’re all done!';try{await navigator.clipboard.writeText(msg);btn.textContent='Copied — send privately'}catch{alert(msg)}});
- }catch(e){c.querySelector('#kcManagerCodeList').textContent=e.message;}finally{b.disabled=false}};
-}
 function commissionerBroadcastUI(){
  if(!(typeof editing!=='undefined'&&editing&&session))return;
  const root=document.getElementById('manage');
@@ -128,6 +115,6 @@ function commissionerBroadcastUI(){
   finally{btn.disabled=false;}
  });
 }
-const observer=new MutationObserver(()=>{managerUI();commissionerUI();commissionerBroadcastUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerUI();commissionerBroadcastUI();
+const observer=new MutationObserver(()=>{managerUI();commissionerBroadcastUI()});observer.observe(document.body,{subtree:true,childList:true});managerUI();commissionerBroadcastUI();
 window.kcGameDayPublish=async links=>{if(!Array.isArray(links)||!links.length)return false;const input=links.map(l=>({week:Number(l.week),pick_no:Number(l.pick_no||1),id:String(l.id),token:String(l.token||'')}));try{await call('publish-links',{links:input},true);return true}catch(e){console.warn('GameDay push queuing failed:',e.message);alert('GameDay links were created, but automatic push delivery could not be queued: '+e.message+'. Please use the manual text links for these picks.');return false}};
 })();
