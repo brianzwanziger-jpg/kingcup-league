@@ -2,8 +2,7 @@
 (()=>{
 const token=new URLSearchParams(location.search).get('gd_token');
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let weeks=[],adminWeeks=[],createdLinks=[],testWeeks=[],testLinks=[],phones={};
-try{const cached=JSON.parse(sessionStorage.getItem('kingcup_gd_test_links')||'[]');if(Array.isArray(cached))testLinks=cached}catch(e){}
+let weeks=[],adminWeeks=[],createdLinks=[],phones={};
 function linkMessage(l){return '🏈 GameDay Pick of the Week\nTap to make your pick: '+l.url;}
 function smsLink(l){const number=phones[l.id];if(!number){toast('Save a phone number for '+l.name+' under Manager phone numbers first');return}location.href='sms:'+number+'&body='+encodeURIComponent(linkMessage(l));}
 function phonePanel(root){const panel=document.createElement('details');panel.className='item';panel.innerHTML='<summary style="cursor:pointer;font-weight:700;font-size:17px">Manager phone numbers ▾</summary><p class="note">Only you can access saved numbers. Enter each 10-digit number once. Text Link opens an individually addressed message; you tap Send in Messages.</p>'+data.members.map(m=>'<label>'+safe(m.name)+'</label><div style="display:flex;gap:8px"><input type="tel" inputmode="tel" placeholder="10-digit phone number" data-phone="'+safe(m.id)+'" value="'+safe(phones[m.id]||'')+'"><button class="secondary" data-save-phone="'+safe(m.id)+'">Save</button></div>').join('');root.appendChild(panel);panel.querySelectorAll('[data-save-phone]').forEach(b=>b.onclick=async()=>{const id=b.dataset.savePhone,number=panel.querySelectorAll('[data-phone]');const input=Array.from(number).find(el=>el.dataset.phone===id);b.disabled=true;try{await rpc('gd_phone_save',{p_member_id:id,p_phone:input.value},true);phones=await rpc('gd_phone_list',{},true);toast('Phone number saved')}catch(err){toast(err.message)}finally{b.disabled=false}});}
@@ -15,7 +14,7 @@ async function rpc(name,params={},admin=false){
  return payload;
 }
 async function refreshPrivate(){
- try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){testWeeks=await rpc('gd_test_status',{},true);phones=await rpc('gd_phone_list',{},true)}else testWeeks=[];if(chosen==='e5'&&tab==='events')render();}
+ try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){phones=await rpc('gd_phone_list',{},true)}if(chosen==='e5'&&tab==='events')render();}
  catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
 async function espnLookup(root){
@@ -86,7 +85,6 @@ function privatePanel(){
    smsLink({id:l.id,name:l.name,week:l.week,away:l.away,home:l.home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)});
   }catch(err){toast(err.message)}finally{b.disabled=false}
  });
- testPanel(root);
  root.querySelector('#espnDate').value=new Date().toISOString().slice(0,10);
  root.querySelector('#espnFind').onclick=()=>espnLookup(root);
  linkButtons(root.querySelector('#privResult'));
@@ -108,27 +106,6 @@ function privatePanel(){
  };
  }
  return root;
-}
-function testPanel(root){
- const panel=document.createElement('details');panel.className='card';panel.style.marginTop='16px';
- panel.innerHTML='<summary style="cursor:pointer;font-weight:700;font-size:18px">🧪 Test Mode — not official ▾</summary><p class="note">Test picks never appear in public standings or official GameDay weeks. Create a short test, text yourself a private invitation, then delete it.</p>'+
- testWeeks.map(w=>'<div class="item"><b>Test '+safe(w.week)+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(w.locked?'Locked':'Open')+'</p>'+w.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?(w.locked?safe(m.pick):'Submitted (commissioner can view: '+safe(m.pick)+')'):'Not submitted')+'</div>').join('')+'<button class="danger" data-delete-test="'+w.week+'">Delete this test</button></div>').join('')+
- '<button class="secondary full" id="testGroupText">Preview Test Group Text (no sending)</button><label>Away team</label><input id="testAway" value="Ohio St"><label>Home team</label><input id="testHome" value="Iowa"><label>Test kickoff (local time)</label><input type="datetime-local" id="testKickoff"><button class="secondary full" id="testCreate">Generate test links</button><div id="testLinks"></div>';
- root.appendChild(panel);
- panel.querySelector('#testGroupText').onclick=()=>{
-  const members=data.members;
-  const lines=members.map((m,i)=>m.name+': '+(i%2?'Texas':'Oklahoma'));
-  const message='🏈 GameDay TEST — Sample Locked Picks\nOklahoma vs Texas\n\n'+lines.join('\n\n')+'\n\nTEST ONLY — NOT OFFICIAL';
-  const recipients=[...new Set(members.map(m=>String(phones[m.id]||'').replace(/[^0-9+]/g,'')).filter(Boolean))];
-  if(!recipients.length)return toast('No saved phone numbers');
-  if(!confirm('Open a group SMS draft addressed to '+recipients.length+' saved numbers? This is sample data. Do NOT tap Send.'))return;
-  location.href='sms://open?addresses='+recipients.join(',')+';?&body='+encodeURIComponent(message);
- };
- panel.querySelector('#testKickoff').value=new Date(Date.now()+10*60000-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
- const result=panel.querySelector('#testLinks');
- if(testLinks.length){result.innerHTML='<p class="note">Test links: send only to yourself. These remain in this browser tab until you close it or delete the test.</p>'+testLinks.map((l,i)=>'<div class="item"><b>'+safe(l.name)+'</b><br><button class="secondary" data-test-text="'+i+'">Text test link</button> <button class="secondary" data-test-copy="'+i+'">Copy test link</button></div>').join('');result.querySelectorAll('[data-test-text]').forEach(b=>b.onclick=()=>{smsLink(testLinks[Number(b.dataset.testText)]);});result.querySelectorAll('[data-test-copy]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(testLinks[Number(b.dataset.testCopy)].url).then(()=>toast('Test link copied')).catch(()=>toast('Copy unavailable')));}
- panel.querySelector('#testCreate').onclick=async()=>{const away=panel.querySelector('#testAway').value.trim(),home=panel.querySelector('#testHome').value.trim(),kickoff=new Date(panel.querySelector('#testKickoff').value),btn=panel.querySelector('#testCreate');if(!away||!home||away.toLowerCase()===home.toLowerCase()||!Number.isFinite(kickoff.getTime())||kickoff.getTime()<=Date.now())return toast('Enter two teams and a future kickoff');btn.disabled=true;try{const response=await rpc('gd_create_test',{p_away:away,p_home:home,p_kickoff:kickoff.toISOString(),p_members:data.members.map(m=>({id:m.id,name:m.name}))},true);testLinks=response.links.map(l=>({id:l.id,name:l.name,week:'TEST',away,home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)}));sessionStorage.setItem('kingcup_gd_test_links',JSON.stringify(testLinks));testWeeks=await rpc('gd_test_status',{},true);render();toast('Test created — text yourself a link')}catch(err){toast(err.message)}finally{btn.disabled=false}};
- panel.querySelectorAll('[data-delete-test]').forEach(b=>b.onclick=async()=>{if(!confirm('Permanently delete this test and all its test picks?'))return;try{await rpc('gd_delete_test',{p_week:Number(b.dataset.deleteTest)},true);testWeeks=await rpc('gd_test_status',{},true);testLinks=[];sessionStorage.removeItem('kingcup_gd_test_links');render();toast('Test deleted')}catch(err){toast(err.message)}});
 }
 const original=gameDayDetail;
 gameDayDetail=function(e){original(e);const detail=$('eventDetail');if(detail)detail.appendChild(privatePanel())};
