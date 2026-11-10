@@ -2,6 +2,7 @@
 (()=>{
 if(new URLSearchParams(location.search).has('gd_token'))return;
 const previous=gameDayDetail;
+const autoChecked=new Set();
 gameDayDetail=function(e){
  previous(e);
  if(e.id!=='e5'||!editing||!session)return;
@@ -9,13 +10,14 @@ gameDayDetail=function(e){
  if(!host)return;
  const box=document.createElement('details');
  box.className='item';
- box.innerHTML='<summary style="cursor:pointer;font-weight:700">🏆 Record GameDay winners & score picks</summary><p class="note">After ESPN marks a matchup final, use Check ESPN to suggest its winner, review the score, then approve it using Save. No official score changes happen automatically.</p><div id="gdScoreRows">Loading weeks…</div>';
+ box.innerHTML='<summary style="cursor:pointer;font-weight:700">🏆 Record GameDay winners & score picks</summary><p class="note">ESPN final scores are checked for the latest completed week. Review the suggested winner and tap Save to approve the official score. Older weeks can be checked manually.</p><div id="gdScoreRows">Loading weeks…</div>';
  host.appendChild(box);
  const rows=box.querySelector('#gdScoreRows');
  api('/rest/v1/rpc/gd_history_weeks',{method:'POST',body:'{}'}).then(async r=>{
  if(!r.ok)throw Error('Unable to load private weeks');
  const weeks=await r.json();
  const eligible=weeks.filter(w=>Date.now()>=Date.parse(w.kickoff));
+ const latestLockedWeek=Math.max(0,...eligible.map(w=>Number(w.week)));
  if(!eligible.length){rows.textContent='No locked weeks yet.';return}
  rows.innerHTML='';
  for(const w of eligible){
@@ -70,6 +72,11 @@ gameDayDetail=function(e){
  button.disabled=true;await save();
  };
  rows.appendChild(row);
+ const lookupKey=w.week+':'+pickNo;
+ if(!old?.winner&&Number(w.week)===latestLockedWeek&&!autoChecked.has(lookupKey)){
+  autoChecked.add(lookupKey);
+  espnButton.click();
+ }
  }
  }).catch(err=>{rows.textContent=err.message});
 };
