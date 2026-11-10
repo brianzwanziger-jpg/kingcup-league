@@ -60,7 +60,7 @@ function managerUI(){
  const c=document.createElement('section');c.id='kcManagerSetup';c.className='card';
  const existing=!!localStorage.getItem(savedKey);
  c.innerHTML=existing
- ? '<h2>🏈 My GameDay Picks <span style="font-size:13px;color:#a4d8b1">✓ Notifications enabled</span></h2><p class="note">Your existing setup is saved. No further action needed.</p><div id="kcManagerPicks"></div>'
+ ? '<div id="kcManagerPicks"></div>'
  : '<h2>🔔 GameDay pick notifications</h2><p class="note">One-time setup: choose your team, enter your 6-digit PIN and allow notifications.</p>'+
  '<label for="kcManagerTeam">Your team</label><select id="kcManagerTeam"><option value="">Loading teams…</option></select>'+
  '<label for="kcManagerPin">Your 6-digit PIN (from the commissioner)</label><input id="kcManagerPin" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="6-digit PIN">'+
