@@ -24,7 +24,7 @@ function dashboard(e){
    const d=await post('commissioner-dashboard');
    if(!section.isConnected)return;
    const weeks=[...new Set(d.games.map(g=>Number(g.week)))].sort((a,b)=>b-a);
-   const chosenWeeks=weeks.slice(0,2),games=d.games.filter(g=>chosenWeeks.includes(Number(g.week)));
+   const newestWeek=weeks[0],games=d.games.filter(g=>Number(g.week)===newestWeek).sort((a,b)=>Number(a.pick_no)-Number(b.pick_no));
    status.textContent='Notification counts represent push-service acceptance, not confirmation a manager read the alert.';
    rows.innerHTML=games.map(g=>{
     const missing=g.managers.filter(m=>!m.submitted);
