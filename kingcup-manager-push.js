@@ -113,6 +113,10 @@ function commissionerBroadcastUI(){
  '<p class="note">Send a KingCup announcement to everyone or selected managers. Only registered devices receive it.</p>'+
  '<label for="kcBroadcastTitle">Notification title</label><input id="kcBroadcastTitle" maxlength="90" placeholder="Example: KingCup update">'+
  '<label for="kcBroadcastBody">Your message</label><textarea id="kcBroadcastBody" maxlength="450" rows="4" placeholder="Type your announcement here"></textarea>'+
+ '<label for="kcBroadcastDestination">Open this tab when tapped</label><select id="kcBroadcastDestination">'+
+ '<option value="overall">Overall Trophy Rankings</option><option value="kingcup">KingCup</option><option value="fantasy">Fantasy Football</option>'+
+ '<option value="gameday">GameDay</option><option value="bowls">Bowl Pick’em</option><option value="march">March Madness</option>'+
+ '<option value="champions">Champion of Champions</option><option value="rules">Rules</option></select>'+
  '<div style="margin:14px 0 8px"><b>Recipients</b></div>'+
  '<label style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="kcBroadcastAll" checked style="width:auto"> Everyone</label>'+
  '<div id="kcBroadcastMembers" style="margin:6px 0 14px" aria-label="Individual managers">Loading managers…</div>'+
@@ -129,19 +133,19 @@ function commissionerBroadcastUI(){
  all.addEventListener('change',draw);
  call('commissioner-push-targets',{},true).then(v=>{managers=v.managers||[];draw()}).catch(e=>{list.textContent='Unable to load managers: '+e.message});
  panel.querySelector('#kcBroadcastSend').addEventListener('click',async()=>{
-  const btn=panel.querySelector('#kcBroadcastSend'),title=panel.querySelector('#kcBroadcastTitle').value.trim(),body=panel.querySelector('#kcBroadcastBody').value.trim();
+  const btn=panel.querySelector('#kcBroadcastSend'),title=panel.querySelector('#kcBroadcastTitle').value.trim(),body=panel.querySelector('#kcBroadcastBody').value.trim(),destination=panel.querySelector('#kcBroadcastDestination').value,destinationName=panel.querySelector('#kcBroadcastDestination').selectedOptions[0].textContent;
   if(!title||!body){status.textContent='Enter a title and message first.';return;}
   if(!managers.length){status.textContent='Manager list is unavailable. Try reopening Manage.';return;}
   const recipients=all.checked?managers:managers.filter((m,i)=>list.querySelector('[data-kc-recipient="'+i+'"]')?.checked);
   if(!recipients.length){status.textContent='Select at least one manager.';return;}
   const enabled=recipients.filter(m=>m.devices>0).length;
   if(!enabled){status.textContent='None of the selected managers have registered notifications.';return;}
-  const preview='Send this KingCup notification?\n\n'+title+'\n'+body+'\n\nRecipients: '+recipients.map(m=>m.name).join(', ')+(enabled<recipients.length?'\n\n'+(recipients.length-enabled)+' selected managers are not registered and will not receive it.':'');
+  const preview='Send this KingCup notification?\n\n'+title+'\n'+body+'\n\nOpens: '+destinationName+'\n\nRecipients: '+recipients.map(m=>m.name).join(', ')+(enabled<recipients.length?'\n\n'+(recipients.length-enabled)+' selected managers are not registered and will not receive it.':'');
   if(!confirm(preview))return;
   btn.disabled=true;status.textContent='Sending…';
   try{
    const reqId=crypto.randomUUID();
-   const result=await call('commissioner-push-send',{request_id:reqId,title,body,member_ids:recipients.map(m=>m.id)},true);
+   const result=await call('commissioner-push-send',{request_id:reqId,title,body,destination,member_ids:recipients.map(m=>m.id)},true);
    status.textContent='Sent to '+result.delivered+' device'+(result.delivered===1?'':'s')+'.'+(result.failed?' '+result.failed+' failed.':'')+(result.unregistered?.length?' Not registered: '+result.unregistered.join(', ')+'.':'');
    if(result.completed&&result.delivered){panel.querySelector('#kcBroadcastBody').value='';}
   }catch(e){status.textContent='Notification was not confirmed: '+e.message+'. Check before attempting another send.';}
