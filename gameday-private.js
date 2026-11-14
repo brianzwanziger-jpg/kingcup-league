@@ -14,7 +14,7 @@ async function rpc(name,params={},admin=false){
  return payload;
 }
 async function refreshPrivate(){
- try{weeks=await rpc('gd_public_weeks');if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){phones=await rpc('gd_phone_list',{},true)}if(chosen==='e5'&&tab==='events')render();}
+ try{weeks=await rpc('gd_public_weeks');window.kcGameDayLatestWeeks=weeks;if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){phones=await rpc('gd_phone_list',{},true)}if(chosen==='e5'&&tab==='events')render();}
  catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
 async function espnLookup(root){
@@ -34,11 +34,12 @@ function privatePanel(){
  const root=document.createElement('section');root.className='card';root.id='privateGameDay';
  const now=Date.now();
  const currentWeek=weeks.filter(w=>Date.parse(w.kickoff)>now).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff))[0]?.week;
- root.innerHTML='<details class="kc-private-results"><summary style="cursor:pointer;font-size:1.25em;font-weight:750">🔒 Private GameDay picks & results ▾</summary><p class="note">Manager choices remain hidden from everyone except the commissioner until kickoff. Submissions lock automatically at kickoff.</p>'+
- weeks.map(w=>{
+ root.innerHTML='<details class="kc-private-results" open><summary style="cursor:pointer;font-size:1.25em;font-weight:750">🏈 GameDay picks & results</summary><p class="note">Each matchup reveals everyone’s picks at its own kickoff. Games that start later stay private and editable until they begin.</p>'+
+ weeks.slice().sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||Number(a.pick_no||1)-Number(b.pick_no||1)).map(w=>{
  const locked=now>=Date.parse(w.kickoff),status=adminWeeks.find(a=>a.week===w.week&&Number(a.pick_no||1)===Number(w.pick_no||1)),pickNo=Number(w.pick_no||1);
- return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+
- (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
+ const official=(data.events.find(e=>e.id==='e5')?.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
+ return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+(locked&&official?.winner?'<p class="note">Winner: '+safe(official.winner)+'</p>':'')+
+ (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+(locked&&official?.winner&&w.picks?.[m.id]?(w.picks[m.id]===official.winner?' ✓':' ✕'):'')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&session&&locked&&status?'<button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">📲 Text All Picks — Week '+safe(w.week)+'</button>':'')+
  (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
  (editing&&status?'<details open><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
@@ -108,7 +109,7 @@ function privatePanel(){
  return root;
 }
 const original=gameDayDetail;
-gameDayDetail=function(e){original(e);const detail=$('eventDetail');if(detail)detail.appendChild(privatePanel())};
+gameDayDetail=function(e){original(e);const detail=$('eventDetail');if(detail?.parentElement)detail.parentElement.insertBefore(privatePanel(),detail)};
 async function invitePage(){
  document.body.innerHTML='<main style="max-width:600px;margin:32px auto;padding:18px;font:16px system-ui"><h1>🏈 KingCup GameDay</h1><div id="invContent">Loading private invitation…</div><a href="./#gameday" id="gdReturnToGameDay" style="display:block;text-align:center;margin:24px 0;padding:15px 20px;background:#214b3c;color:#fff;border-radius:12px;font-weight:700;text-decoration:none">← Return to GameDay</a></main>';
  const area=document.getElementById('invContent');
