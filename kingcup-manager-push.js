@@ -82,10 +82,16 @@ async function showTeams(){
 }
 function managerUI(){
  if(typeof tab==='undefined'||tab!=='events'||chosen!=='e5')return;
+ const existing=!!localStorage.getItem(savedKey);
+ const latest=window.kcGameDayLatestWeeks;
+ const allLocked=Array.isArray(latest)&&latest.length>0&&latest.every(w=>Date.now()>=Date.parse(w.kickoff));
+ if(existing&&allLocked){
+  document.getElementById('kcManagerSetup')?.remove();
+  return;
+ }
  if(document.getElementById('kcManagerSetup'))return;
  const destination=document.getElementById('eventDetail');if(!destination?.parentElement)return;
  const c=document.createElement('section');c.id='kcManagerSetup';c.className='card';
- const existing=!!localStorage.getItem(savedKey);
  c.innerHTML=existing
  ? '<div id="kcManagerPicks"></div>'
  : '<h2>🔔 GameDay pick notifications</h2><p class="note">One-time setup: choose your team, enter your 6-digit PIN and allow notifications.</p>'+
