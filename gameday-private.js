@@ -34,7 +34,10 @@ function privatePanel(){
  const root=document.createElement('section');root.className='card';root.id='privateGameDay';
  const now=Date.now();
  const currentWeek=weeks.filter(w=>Date.parse(w.kickoff)>now).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff))[0]?.week;
- root.innerHTML='<details class="kc-private-results" open><summary style="cursor:pointer;font-size:1.25em;font-weight:750">🏈 GameDay picks & results</summary><p class="note">Each matchup reveals everyone’s picks at its own kickoff. Games that start later stay private and editable until they begin.</p>'+
+ const latestWeek=Math.max(0,...weeks.map(w=>Number(w.week)));
+ const latestGames=weeks.filter(w=>Number(w.week)===latestWeek);
+ const allCurrentGamesLocked=latestGames.length>0&&latestGames.every(w=>now>=Date.parse(w.kickoff));
+ root.innerHTML='<details class="kc-private-results"'+(allCurrentGamesLocked?'':' open')+'><summary style="cursor:pointer;font-size:1.25em;font-weight:750">🏈 GameDay picks & results</summary><p class="note">Each matchup reveals everyone’s picks at its own kickoff. Games that start later stay private and editable until they begin.</p>'+
  weeks.slice().sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||Number(a.pick_no||1)-Number(b.pick_no||1)).map(w=>{
  const locked=now>=Date.parse(w.kickoff),status=adminWeeks.find(a=>a.week===w.week&&Number(a.pick_no||1)===Number(w.pick_no||1)),pickNo=Number(w.pick_no||1);
  const official=(data.events.find(e=>e.id==='e5')?.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
