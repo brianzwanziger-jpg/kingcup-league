@@ -13,9 +13,20 @@ async function rpc(name,params={},admin=false){
  if(!response.ok)throw Error(payload?.message||payload?.error||'Request failed');
  return payload;
 }
-async function refreshPrivate(){
- try{weeks=await rpc('gd_public_weeks');window.kcGameDayLatestWeeks=weeks;if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);else adminWeeks=[];if(editing&&session){phones=await rpc('gd_phone_list',{},true)}if(chosen==='e5'&&tab==='events')render();}
- catch(err){console.warn('Private GameDay refresh:',err.message);}
+let privateGameDayInitiallyLoaded=false;
+async function refreshPrivate(force=false){
+ try{
+  const onGameDay=chosen==='e5'&&tab==='events';
+  // Never replace an active GameDay editor during a scheduled poll.
+  // Explicit refreshes and the first private-data load may render.
+  weeks=await rpc('gd_public_weeks');
+  window.kcGameDayLatestWeeks=weeks;
+  if(editing&&session)adminWeeks=await rpc('gd_admin_status',{},true);
+  else adminWeeks=[];
+  if(editing&&session)phones=await rpc('gd_phone_list',{},true);
+  if(onGameDay&&(force||!privateGameDayInitiallyLoaded))render();
+  privateGameDayInitiallyLoaded=true;
+ }catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
 async function espnLookup(root){
  const status=root.querySelector('#espnStatus'),date=root.querySelector('#espnDate').value;
@@ -75,7 +86,7 @@ function privatePanel(){
   try{
    const v=await rpc('gd_cancel_pick',{p_week:week,p_pick_no:pickNo},true);
    createdLinks=createdLinks.filter(l=>!(Number(l.week)===week&&Number(l.pick_no||1)===pickNo));
-   await refreshPrivate();
+   await refreshPrivate(true);
    toast('Week '+week+' Pick '+pickNo+' canceled. Create the replacement and send new links.');
   }catch(err){toast('Cancel failed: '+err.message);b.disabled=false}
  });
@@ -92,7 +103,7 @@ function privatePanel(){
  root.querySelector('#espnDate').value=new Date().toISOString().slice(0,10);
  root.querySelector('#espnFind').onclick=()=>espnLookup(root);
  linkButtons(root.querySelector('#privResult'));
- root.querySelector('#privRefresh').onclick=refreshPrivate;
+ root.querySelector('#privRefresh').onclick=()=>refreshPrivate(true);
  root.querySelector('#privCreate').onclick=async()=>{
  const week=Number(root.querySelector('#privWeek').value),away=root.querySelector('#privAway').value.trim(),home=root.querySelector('#privHome').value.trim(),raw=root.querySelector('#privKickoff').value;
  const kickoff=new Date(raw);
@@ -132,5 +143,5 @@ async function invitePage(){
  }
  await load();
 }
-window.gdRefreshPrivate=refreshPrivate;if(token)invitePage();else{refreshPrivate();setInterval(refreshPrivate,60000);}
+window.gdRefreshPrivate=()=>refreshPrivate(true);if(token)invitePage();else{refreshPrivate();setInterval(()=>refreshPrivate(false),60000);}
 })();
