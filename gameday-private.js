@@ -58,9 +58,23 @@ function privatePanel(){
  (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
  (editing&&status?'<details open><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
  }).join('')+'</details>'+ 
- (editing&&session?'<h3>ESPN College GameDay matchup</h3><p class="note">Check ESPN’s announcement first, then find the confirmed game in its schedule. Registered managers receive automatic push invitations.</p><a href="https://espnpressroom.com/" target="_blank" rel="noopener">ESPN announcements ↗</a><label>Game date</label><input id="espnDate" type="date"><button id="espnFind" class="secondary full">Find ESPN matchups</button><div id="espnStatus"></div><h3>Create a private week</h3><p class="note">Choose a future kickoff. Each manager receives a unique link. Copy the links immediately: for security, they are displayed only when created.</p><label>Week number</label><input id="privWeek" type="number" min="1" step="1"><label>Away team</label><input id="privAway"><label>Home team</label><input id="privHome"><label>Kickoff (your local time)</label><input id="privKickoff" type="datetime-local"><button id="privCreate" class="full">Create private manager links</button><div id="privResult"></div><button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
+ (editing&&session?'<div class="item"><h3>🏈 Create GameDay Matchup</h3>'+
+ '<p class="note">Choose Pick 1 or Pick 2, select a matchup, then create it. Notifications are sent automatically.</p>'+
+ '<label for="privWeek">Week</label><input id="privWeek" type="number" min="1" step="1" inputmode="numeric">'+
+ '<label for="privPickNo">Pick number</label><select id="privPickNo"><option value="1">Pick 1</option><option value="2">Pick 2</option></select>'+
+ '<label for="espnDate">Game date</label><input id="espnDate" type="date">'+
+ '<button type="button" id="espnFind" class="secondary full">Find matchup on ESPN</button><div id="espnStatus"></div>'+
+ '<p class="note">Or enter the two teams and kickoff manually below.</p>'+
+ '<label for="privAway">Away team</label><input id="privAway" placeholder="Away team">'+
+ '<label for="privHome">Home team</label><input id="privHome" placeholder="Home team">'+
+ '<label for="privKickoff">Kickoff (local time)</label><input id="privKickoff" type="datetime-local">'+
+ '<button type="button" id="privCreate" class="full">Create Pick &amp; Notify Managers</button>'+
+ '<div id="privResult"></div></div>'+
+ '<details class="item"><summary style="cursor:pointer;font-weight:650">📩 Backup texting &amp; phone numbers</summary>'+
+ '<p class="note">Use only if a manager cannot receive push notifications.</p><div id="privBackupPhones"></div></details>'+
+ '<button id="privRefresh" class="secondary full">Refresh submission status</button>':'');;
  if(editing&&session){
- phonePanel(root);
+ phonePanel(root.querySelector('#privBackupPhones'));
  root.querySelectorAll('[data-text-all-picks]').forEach(b=>b.onclick=()=>{
   const week=Number(b.dataset.textAllPicks),pickNo=Number(b.dataset.textAllPick||1),w=weeks.find(x=>Number(x.week)===week&&Number(x.pick_no||1)===pickNo),status=adminWeeks.find(x=>Number(x.week)===week&&Number(x.pick_no||1)===pickNo);
   if(!w||!status||Date.now()<Date.parse(w.kickoff))return toast('Picks are not locked yet');
@@ -105,20 +119,24 @@ function privatePanel(){
  linkButtons(root.querySelector('#privResult'));
  root.querySelector('#privRefresh').onclick=()=>refreshPrivate(true);
  root.querySelector('#privCreate').onclick=async()=>{
- const week=Number(root.querySelector('#privWeek').value),away=root.querySelector('#privAway').value.trim(),home=root.querySelector('#privHome').value.trim(),raw=root.querySelector('#privKickoff').value;
+ const week=Number(root.querySelector('#privWeek').value),pickNo=Number(root.querySelector('#privPickNo').value);
+ const away=root.querySelector('#privAway').value.trim(),home=root.querySelector('#privHome').value.trim(),raw=root.querySelector('#privKickoff').value;
  const kickoff=new Date(raw);
- if(!Number.isInteger(week)||week<1||!away||!home||away.toLowerCase()===home.toLowerCase()||!raw||!Number.isFinite(kickoff.getTime())||kickoff.getTime()<=Date.now())return toast('Enter a valid week, teams and future kickoff');
- if((data.events.find(e=>e.id==='e5')?.gameday?.games||[]).some(g=>Number(g.week)===week)&&!confirm('This week already has a legacy game. Its public picks are not private. Continue with a separate private week?'))return;
+ if(!Number.isInteger(week)||week<1||![1,2].includes(pickNo)||!away||!home||away.toLowerCase()===home.toLowerCase()||!raw||!Number.isFinite(kickoff.getTime())||kickoff.getTime()<=Date.now())return toast('Enter a valid week, pick number, teams and future kickoff.');
+ if(weeks.some(w=>Number(w.week)===week&&Number(w.pick_no||1)===pickNo))return toast('Week '+week+' Pick '+pickNo+' already exists. Nothing changed.');
  const btn=root.querySelector('#privCreate');btn.disabled=true;
  try{
- const links=await rpc('gd_create_week',{p_week:week,p_away:away,p_home:home,p_kickoff:kickoff.toISOString(),p_members:data.members.map(m=>({id:m.id,name:m.name}))},true);
- createdLinks=links.map(l=>({id:l.id,name:l.name,week,away,home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)}));
- const queued=await window.kcGameDayPublish?.(links.map(l=>({id:l.id,token:l.token,week,pick_no:1})));if(queued)toast('Links created; manager push notifications queued');
- const result=root.querySelector('#privResult');
- linkButtons(result);
- weeks=await rpc('gd_public_weeks');adminWeeks=await rpc('gd_admin_status',{},true);
- }catch(err){toast(err.message)}finally{btn.disabled=false}
- };
+  const links=await rpc('gd_create_pick',{p_week:week,p_pick_no:pickNo,p_away:away,p_home:home,p_kickoff:kickoff.toISOString(),p_members:data.members.map(m=>({id:m.id,name:m.name}))},true);
+  createdLinks=links.map(l=>({id:l.id,name:l.name,week,pick_no:pickNo,away,home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)}));
+  const queued=await window.kcGameDayPublish?.(links.map(l=>({id:l.id,token:l.token,week,pick_no:pickNo})));
+  toast(queued?'Week '+week+' Pick '+pickNo+' created — notifications queued':'Pick created; use backup links if notifications are unavailable.');
+  linkButtons(root.querySelector('#privResult'));
+  weeks=await rpc('gd_public_weeks');window.kcGameDayLatestWeeks=weeks;
+  adminWeeks=await rpc('gd_admin_status',{},true);
+  root.querySelector('#privPickNo').value=pickNo===1?'2':'1';
+ }catch(err){toast('Could not create pick: '+err.message)}
+ finally{btn.disabled=false}
+ }
  }
  return root;
 }
