@@ -11,14 +11,39 @@ async function call(action,payload={},admin=false){
  const v=await r.json().catch(()=>({}));if(!r.ok)throw Error(v.error||'KingCup request failed');return v;
 }
 let showManager=false;
+let pickCollapseTimer=null;
+function schedulePickCollapse(){
+ if(pickCollapseTimer!==null){clearTimeout(pickCollapseTimer);pickCollapseTimer=null;}
+ const disclosure=document.getElementById('kcManagerPicksDisclosure');
+ if(!disclosure)return;
+ const all=window.kcGameDayLatestWeeks||[];
+ if(!Array.isArray(all)||!all.length)return;
+ const latestWeek=Math.max(...all.map(w=>Number(w.week)||0));
+ const games=all.filter(w=>Number(w.week)===latestWeek);
+ const kickoff=Math.min(...games.map(w=>Date.parse(w.kickoff)));
+ if(!Number.isFinite(kickoff))return;
+ if(kickoff<=Date.now()){
+  disclosure.open=false;
+ }else{
+  disclosure.open=true;
+  pickCollapseTimer=setTimeout(()=>{
+   pickCollapseTimer=null;
+   const live=document.getElementById('kcManagerPicksDisclosure');
+   if(live)live.open=false;
+  },Math.min(kickoff-Date.now()+1000,2147483647));
+ }
+}
+
 async function loadPicks(){
  const code=localStorage.getItem(savedKey);if(!code)return;
  const root=document.getElementById('kcManagerPicks');if(!root)return;
  try{
   const v=await call('manager-picks',{code});
   if(!root.isConnected)return;
+  schedulePickCollapse();
   const picks=v.picks||[];
-  root.innerHTML='<h2>🏈 '+safe(v.name)+' — My GameDay Picks</h2>'+
+  const heading=document.getElementById('kcManagerPicksSummary');if(heading)heading.textContent='🏈 '+v.name+' — My GameDay Picks';
+  root.innerHTML=
    (picks.length?'<p class="note">Choose your winners, then save both picks together. You can change either pick until its own kickoff.</p>'+
    picks.map(p=>'<div class="item"><b>Week '+safe(p.week)+' — Pick '+safe(p.pick_no)+'</b>'+
    '<p class="note">'+safe(p.away)+' vs '+safe(p.home)+' · '+(p.submitted?'✓ Submitted':'Not submitted')+
@@ -93,14 +118,15 @@ function managerUI(){
  const destination=document.getElementById('eventDetail');if(!destination?.parentElement)return;
  const c=document.createElement('section');c.id='kcManagerSetup';c.className='card';
  c.innerHTML=existing
- ? '<div id="kcManagerPicks"></div>'
+ ? '<details id="kcManagerPicksDisclosure" open><summary id="kcManagerPicksSummary" style="cursor:pointer;font-size:1.25em;font-weight:750">🏈 My GameDay Picks</summary><div id="kcManagerPicks" style="margin-top:12px"></div></details>'
  : '<h2>🔔 GameDay pick notifications</h2><p class="note">One-time setup: choose your team, enter your 6-digit PIN and allow notifications.</p>'+
  '<label for="kcManagerTeam">Your team</label><select id="kcManagerTeam"><option value="">Loading teams…</option></select>'+
  '<label for="kcManagerPin">Your 6-digit PIN (from the commissioner)</label><input id="kcManagerPin" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="6-digit PIN">'+
  '<button type="button" id="kcManagerEnable" class="full" style="margin-top:10px">Enable Notifications</button>'+
  '<p class="note" role="status" id="kcManagerStatus">You only need to do this once.</p><div id="kcManagerPicks"></div>';
- destination.parentElement.insertBefore(c,destination);
- if(existing)loadPicks();
+ const results=document.getElementById('privateGameDay');
+ destination.parentElement.insertBefore(c,results?.parentElement===destination.parentElement?results:destination);
+ if(existing){schedulePickCollapse();loadPicks();}
  else{c.querySelector('#kcManagerEnable').addEventListener('click',enable);showTeams();}
 }
 function commissionerBroadcastUI(){
