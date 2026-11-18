@@ -54,9 +54,9 @@ function privatePanel(){
  const official=(data.events.find(e=>e.id==='e5')?.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
  return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+(locked&&official?.winner?'<p class="note">Winner: '+safe(official.winner)+'</p>':'')+
  (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+(locked&&official?.winner&&w.picks?.[m.id]?(w.picks[m.id]===official.winner?' ✓':' ✕'):'')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
- (editing&&session&&locked&&status?'<button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">📲 Text All Picks — Week '+safe(w.week)+'</button>':'')+
+ (editing&&session&&locked&&status?'<details style="margin:8px 0"><summary style="cursor:pointer">Backup: Text everyone’s picks</summary><button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">Text all picks — Week '+safe(w.week)+'</button></details>':'')+
  (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
- (editing&&status?'<details open><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
+ (editing&&status?'<details><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
  }).join('')+'</details>'+ 
  (editing&&session?'<div class="item"><h3>🏈 Create GameDay Matchup</h3>'+
  '<p class="note">Choose Pick 1 or Pick 2, select a matchup, then create it. Notifications are sent automatically.</p>'+
@@ -72,7 +72,7 @@ function privatePanel(){
  '<div id="privResult"></div></div>'+
  '<details class="item"><summary style="cursor:pointer;font-weight:650">📩 Backup texting &amp; phone numbers</summary>'+
  '<p class="note">Use only if a manager cannot receive push notifications.</p><div id="privBackupPhones"></div></details>'+
- '<button id="privRefresh" class="secondary full">Refresh submission status</button>':'');;
+ '<button id="privRefresh" class="secondary full">Refresh submission status</button>':'');
  if(editing&&session){
  phonePanel(root.querySelector('#privBackupPhones'));
  root.querySelectorAll('[data-text-all-picks]').forEach(b=>b.onclick=()=>{
@@ -114,6 +114,11 @@ function privatePanel(){
    smsLink({id:l.id,name:l.name,week:l.week,away:l.away,home:l.home,url:location.origin+location.pathname+'?gd_token='+encodeURIComponent(l.token)});
   }catch(err){toast(err.message)}finally{b.disabled=false}
  });
+ const mostRecent=Math.max(0,...weeks.map(w=>Number(w.week)));
+ const hasPick1=weeks.some(w=>Number(w.week)===mostRecent&&Number(w.pick_no||1)===1);
+ const hasPick2=weeks.some(w=>Number(w.week)===mostRecent&&Number(w.pick_no||1)===2);
+ root.querySelector('#privWeek').value=hasPick1&&!hasPick2?mostRecent:Math.max(1,mostRecent+1);
+ root.querySelector('#privPickNo').value=hasPick1&&!hasPick2?'2':'1';
  root.querySelector('#espnDate').value=new Date().toISOString().slice(0,10);
  root.querySelector('#espnFind').onclick=()=>espnLookup(root);
  linkButtons(root.querySelector('#privResult'));
