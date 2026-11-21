@@ -13,6 +13,16 @@ async function rpc(name,params={},admin=false){
  if(!response.ok)throw Error(payload?.message||payload?.error||'Request failed');
  return payload;
 }
+function updatePublicGameDayCounts(){
+ for(const w of weeks){
+  const row=document.querySelector('#privateGameDay .kc-public-pick-count[data-week="'+Number(w.week)+'"][data-pick="'+Number(w.pick_no||1)+'"]');
+  if(!row)continue;
+  const total=Math.max(0,Number(w.total)||0),submitted=Math.min(total,Math.max(0,Number(w.submitted)||0));
+  const label=row.querySelector('.kc-public-count-label'),fill=row.querySelector('.kc-public-count-fill');
+  if(label)label.textContent=submitted+' / '+total+' picks submitted';
+  if(fill)fill.style.width=(total?Math.round(100*submitted/total):0)+'%';
+ }
+}
 let privateGameDayInitiallyLoaded=false;
 async function refreshPrivate(force=false){
  try{
@@ -25,6 +35,7 @@ async function refreshPrivate(force=false){
   else adminWeeks=[];
   if(editing&&session)phones=await rpc('gd_phone_list',{},true);
   if(onGameDay&&(force||!privateGameDayInitiallyLoaded))render();
+  else if(onGameDay)updatePublicGameDayCounts();
   privateGameDayInitiallyLoaded=true;
  }catch(err){console.warn('Private GameDay refresh:',err.message);}
 }
@@ -52,7 +63,10 @@ function privatePanel(){
  weeks.slice().sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||Number(a.pick_no||1)-Number(b.pick_no||1)).map(w=>{
  const locked=now>=Date.parse(w.kickoff),status=adminWeeks.find(a=>a.week===w.week&&Number(a.pick_no||1)===Number(w.pick_no||1)),pickNo=Number(w.pick_no||1);
  const official=(data.events.find(e=>e.id==='e5')?.gameday?.games||[]).find(g=>Number(g.week)===Number(w.week)&&Number(g.pick_no||1)===pickNo);
- return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+(locked&&official?.winner?'<p class="note">Winner: '+safe(official.winner)+'</p>':'')+
+ return '<div class="item"><b>Week '+safe(w.week)+(pickNo>1?' — Pick '+pickNo:' — Pick 1')+': '+safe(w.away)+' vs '+safe(w.home)+'</b><p class="note">Kickoff: '+safe(new Date(w.kickoff).toLocaleString())+' · '+(locked?'Locked — picks revealed':'Picks hidden until kickoff')+'</p>'+
+ '<div class="kc-public-pick-count" data-week="'+safe(w.week)+'" data-pick="'+safe(pickNo)+'" style="margin:12px 0 16px">'+
+ '<div class="kc-public-count-label" style="font-weight:650;margin-bottom:7px">'+safe(Math.min(Number(w.total)||0,Number(w.submitted)||0))+' / '+safe(Number(w.total)||0)+' picks submitted</div>'+
+ '<div style="height:9px;background:#29443a;border-radius:12px;overflow:hidden"><div class="kc-public-count-fill" style="height:100%;width:'+safe(Number(w.total)?Math.round(100*Number(w.submitted||0)/Number(w.total)):0)+'%;background:#d5ad55;border-radius:12px"></div></div></div>'+(locked&&official?.winner?'<p class="note">Winner: '+safe(official.winner)+'</p>':'')+
  (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+(locked&&official?.winner&&w.picks?.[m.id]?(w.picks[m.id]===official.winner?' ✓':' ✕'):'')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&session&&locked&&status?'<details style="margin:8px 0"><summary style="cursor:pointer">Backup: Text everyone’s picks</summary><button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">Text all picks — Week '+safe(w.week)+'</button></details>':'')+
  (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
