@@ -70,7 +70,15 @@ function privatePanel(){
  (locked?'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px 12px;margin:12px 0"><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Manager</div><div style="font-weight:700;border-bottom:1px solid #41634d;padding-bottom:6px">Pick</div>'+data.members.map(m=>'<div style="min-width:0;overflow-wrap:anywhere">'+safe(m.name)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+safe(w.picks?.[m.id]||'No pick')+(locked&&official?.winner&&w.picks?.[m.id]?(w.picks[m.id]===official.winner?' ✓':' ✕'):'')+'</div>').join('')+'</div>':'<p class="note">Other managers cannot see selections yet.</p>')+
  (editing&&session&&locked&&status?'<details style="margin:8px 0"><summary style="cursor:pointer">Backup: Text everyone’s picks</summary><button class="secondary full" data-text-all-picks="'+safe(w.week)+'" data-text-all-pick="'+safe(pickNo)+'">Text all picks — Week '+safe(w.week)+'</button></details>':'')+
  (editing&&session&&!locked&&status?'<button class="danger" data-cancel-gd-week="'+safe(w.week)+'" data-cancel-gd-pick="'+safe(pickNo)+'" style="margin:12px 0;width:100%">Cancel this matchup &amp; invalidate links</button>':'')+
- (editing&&status?'<details><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>':'')+'</div>';
+ (editing&&status?'<details><summary><b>Commissioner pick tracker — Week '+safe(w.week)+' Pick '+pickNo+'</b></summary>'+status.members.map(m=>'<div class="mini">'+safe(m.name)+': '+(m.submitted?'Submitted':'Not submitted')+(m.submitted?' — '+safe(m.pick):'')+(w.week===currentWeek?' <button class="secondary" data-resend-week="'+safe(w.week)+'" data-resend-pick="'+safe(pickNo)+'" data-resend-member="'+safe(m.id)+'">Resend link</button>':'')+'</div>').join('')+'</details>'+
+ '<details class="item" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">✏️ Commissioner: Enter or change a manager’s pick</summary>'+
+ '<p class="note">Authorized commissioner correction. Works before or after kickoff; all changes are recorded.</p>'+
+ '<label>Manager</label><select data-override-manager="'+safe(w.week)+'-'+safe(pickNo)+'"><option value="">Choose manager</option>'+
+ status.members.map(m=>'<option value="'+safe(m.id)+'">'+safe(m.name)+(m.pick?' — '+safe(m.pick):' — No pick')+'</option>').join('')+'</select>'+
+ '<label>Winning team selected by manager</label><select data-override-team="'+safe(w.week)+'-'+safe(pickNo)+'"><option value="">Choose their pick</option>'+
+ '<option value="'+safe(w.away)+'">'+safe(w.away)+'</option><option value="'+safe(w.home)+'">'+safe(w.home)+'</option></select>'+
+ '<button type="button" class="secondary full" data-override-save="'+safe(w.week)+'-'+safe(pickNo)+'" data-week="'+safe(w.week)+'" data-pick="'+safe(pickNo)+'" style="margin-top:10px">Save manager’s pick</button>'+
+ '<p class="note" role="status" data-override-status="'+safe(w.week)+'-'+safe(pickNo)+'"></p></details>':'')+'</div>';
  }).join('')+'</details>'+ 
  (editing&&session?'<div class="item"><h3>🏈 Create GameDay Matchup</h3>'+
  '<p class="note">Choose Pick 1 or Pick 2, select a matchup, then create it. Notifications are sent automatically.</p>'+
@@ -101,6 +109,28 @@ function privatePanel(){
    return m.name+': '+(p?.pick||'No pick');
   }).join('\n\n');
   location.href='sms://open?addresses='+recipients.join(',')+';?&body='+encodeURIComponent(message);
+ });
+ root.querySelectorAll('[data-override-save]').forEach(button=>button.onclick=async()=>{
+  const key=button.dataset.overrideSave,week=Number(button.dataset.week),pickNo=Number(button.dataset.pick);
+  const manager=root.querySelector('[data-override-manager="'+key+'"]')?.value;
+  const pick=root.querySelector('[data-override-team="'+key+'"]')?.value;
+  const label=root.querySelector('[data-override-status="'+key+'"]');
+  const match=weeks.find(w=>Number(w.week)===week&&Number(w.pick_no||1)===pickNo);
+  const existing=adminWeeks.find(w=>Number(w.week)===week&&Number(w.pick_no||1)===pickNo)?.members.find(m=>m.id===manager);
+  if(!manager||!pick){if(label)label.textContent='Choose a manager and a team first.';return;}
+  if(existing?.pick===pick){if(label)label.textContent='That manager already has this pick saved.';return;}
+  const after=match&&Date.now()>=Date.parse(match.kickoff);
+  const managerName=existing?.name||'this manager';
+  if(!confirm('Record '+managerName+' picking '+pick+' for Week '+week+' Pick '+pickNo+'?'+
+     (after?'\\n\\nThe game has already started. This is a late commissioner override and will be recorded.':'')))return;
+  button.disabled=true;if(label)label.textContent='Saving correction…';
+  try{
+   const result=await rpc('gd_commissioner_set_pick',{p_week:week,p_pick_no:pickNo,p_member_id:manager,p_pick:pick},true);
+   if(label)label.textContent='✓ Saved'+(result.late?' after kickoff':'')+'.';
+   if(result.official_synced)await loadCloud();
+   await refreshPrivate(true);
+   toast('Commissioner pick saved for '+managerName);
+  }catch(err){if(label)label.textContent='Not saved: '+err.message;button.disabled=false;}
  });
  root.querySelectorAll('[data-cancel-gd-week]').forEach(b=>b.onclick=async()=>{
   const week=Number(b.dataset.cancelGdWeek),pickNo=Number(b.dataset.cancelGdPick);
